@@ -302,163 +302,65 @@ class NormalizedChannelsSedDataset(data.Dataset):
             "duration": duration,
             "period": self.period
         }
-
-
-class ChannelsSedDataset(data.Dataset):
-    def __init__(self, df: pd.DataFrame, datadir: Path, transforms=None,
-                 denoised_audio_dir=None, melspectrogram_parameters={},
-                 pcen_parameters={},
-                 period=30):
-        self.df = df
-        self.datadir = datadir
-        self.transforms = transforms
-        self.denoised_audio_dir = denoised_audio_dir
-        if denoised_audio_dir is not None:
-            self.use_denoised = True
-        else:
-            self.use_denoised = False
-        self.melspectrogram_parameters = melspectrogram_parameters
-        self.pcen_parameters = pcen_parameters
-        self.period = period
-
-    def __len__(self):
-        return len(self.df)
-
-    def __getitem__(self, idx: int):
-        sample = self.df.loc[idx, :]
-        wav_name = sample["resampled_filename"]
-        ebird_code = sample["ebird_code"]
-        secondary_labels = eval(sample["secondary_labels"])
-
-        if self.use_denoised:
-            path = self.denoised_audio_dir / ebird_code / wav_name
-            if path.exists():
-                y, sr = sf.read(path)
-            else:
-                y, sr = sf.read(self.datadir / ebird_code / wav_name)
-        else:
-            y, sr = sf.read(self.datadir / ebird_code / wav_name)
-
-        duration = len(y) / sr
-        if self.transforms:
-            y = self.transforms(y)
-
-        images = []
-        len_y = len(y)
-        start = 0
-        end = sr * self.period
-        while len_y > start:
-            y_batch = y[start:end].astype(np.float32)
-            if len(y_batch) != (sr * self.period):
-                y_batch_large = np.zeros(sr * self.period, dtype=y_batch.dtype)
-                y_batch_large[:len(y_batch)] = y_batch
-
-                melspec = librosa.feature.melspectrogram(
-                    y_batch_large, sr=sr, **self.melspectrogram_parameters)
-                pcen = librosa.pcen(melspec, sr=sr, **self.pcen_parameters)
-                clean_mel = librosa.power_to_db(melspec ** 1.5)
-                melspec = librosa.power_to_db(melspec)
-
-                norm_melspec = normalize_melspec(melspec)
-                norm_pcen = normalize_melspec(pcen)
-                norm_clean_mel = normalize_melspec(clean_mel)
-                image = np.stack([norm_melspec, norm_pcen, norm_clean_mel], axis=-1)
-
-                height, width, _ = image.shape
-                image = cv2.resize(image, (int(width * 224 / height), 224))
-                image = np.moveaxis(image, 2, 0)
-                image = (image / 255.0).astype(np.float32)
-
-                images.append(image)
-                break
-            start = end
-            end = end + sr * self.period
-
-            melspec = librosa.feature.melspectrogram(
-                y_batch, sr=sr, **self.melspectrogram_parameters)
-            pcen = librosa.pcen(melspec, sr=sr, **self.pcen_parameters)
-            clean_mel = librosa.power_to_db(melspec ** 1.5)
-            melspec = librosa.power_to_db(melspec)
-
-            norm_melspec = normalize_melspec(melspec)
-            norm_pcen = normalize_melspec(pcen)
-            norm_clean_mel = normalize_melspec(clean_mel)
-            image = np.stack([norm_melspec, norm_pcen, norm_clean_mel], axis=-1)
-            height, width, _ = image.shape
-            image = cv2.resize(image, (int(width * 224 / height), 224))
-            image = np.moveaxis(image, 2, 0)
-            image = (image / 255.0).astype(np.float32)
-
-            images.append(image)
-        images = np.asarray(images).astype(np.float32)
-
-        labels = np.zeros(len(BIRD_CODE), dtype=int)
-        labels[BIRD_CODE[ebird_code]] = 1
-        for secondary_label in secondary_labels:
-            code = NAME2CODE.get(secondary_label)
-            if code is None:
-                continue
-            else:
-                labels[
-                    BIRD_CODE[code]
-                ] = 1
-
-        return {
-            "image": images,
-            "targets": labels,
-            "ebird_code": ebird_code,
-            "wav_name": wav_name,
-            "duration": duration,
-            "period": self.period
-        }
-
-
-class MultiChannelDataset(data.Dataset):
+class WaveformDatasetMETA(data.Dataset):
     def __init__(self,
                  df: pd.DataFrame,
                  datadir: Path,
+                 spectrogram_transforms,
+                 melspectrogram_parameters,
+                 pcen_parameters,
                  img_size=224,
                  waveform_transforms=None,
-                 spectrogram_transforms=None,
-                 melspectrogram_parameters={},
-                 pcen_parameters={},
-                 period=30):
+                 period=20,
+                 validation=False):
         self.df = df
         self.datadir = datadir
         self.img_size = img_size
         self.waveform_transforms = waveform_transforms
+        self.period = period
+        self.validation = validation
         self.spectrogram_transforms = spectrogram_transforms
         self.melspectrogram_parameters = melspectrogram_parameters
         self.pcen_parameters = pcen_parameters
-        self.period = period
 
     def __len__(self):
         return len(self.df)
 
     def __getitem__(self, idx: int):
         sample = self.df.loc[idx, :]
-        wav_name = sample["resampled_filename"]
-        ebird_code = sample["ebird_code"]
-        secondary_labels = eval(sample["secondary_labels"])
-
+        wav_name = sample["filename"]
+        ebird_code = sample["primary_label"]
+        secondary_label = eval(sample['secondary_labels'])
+        meta_data = np.array(sample[['latitude', "longitude"]])
+        data= np.array(list(map(int , [sample['date'].split('-'))))
+        meta_data = np.hstack((meta_data, data))
         y, sr = sf.read(self.datadir / ebird_code / wav_name)
 
         len_y = len(y)
         effective_length = sr * self.period
         if len_y < effective_length:
             new_y = np.zeros(effective_length, dtype=y.dtype)
-            start = np.random.randint(effective_length - len_y)
+            if not self.validation:
+                start = np.random.randint(effective_length - len_y)
+            else:
+                start = 0
             new_y[start:start + len_y] = y
             y = new_y.astype(np.float32)
         elif len_y > effective_length:
-            start = np.random.randint(len_y - effective_length)
+            if not self.validation:
+                start = np.random.randint(len_y - effective_length)
+            else:
+                start = 0
             y = y[start:start + effective_length].astype(np.float32)
         else:
             y = y.astype(np.float32)
 
+        y = np.nan_to_num(y)
+
         if self.waveform_transforms:
             y = self.waveform_transforms(y)
 
+        y = np.nan_to_num(y)
         melspec = librosa.feature.melspectrogram(y, sr=sr, **self.melspectrogram_parameters)
         pcen = librosa.pcen(melspec, sr=sr, **self.pcen_parameters)
         clean_mel = librosa.power_to_db(melspec ** 1.5)
@@ -480,146 +382,20 @@ class MultiChannelDataset(data.Dataset):
         image = cv2.resize(image, (int(width * self.img_size / height), self.img_size))
         image = np.moveaxis(image, 2, 0)
         image = (image / 255.0).astype(np.float32)
+        
 
-        labels = np.zeros(len(BIRD_CODE), dtype=int)
-        labels[BIRD_CODE[ebird_code]] = 1
-        for second_label in secondary_labels:
-            if NAME2CODE.get(second_label) is not None:
-                second_code = NAME2CODE[second_label]
-                labels[BIRD_CODE[second_code]] = 1
+        labels = np.zeros(len(BIRD_CODE), dtype=float)
+        labels[BIRD_CODE.index(ebird_code)] = 1.0
+        # for second_label in secondary_label:
+        #     labels[CFG.target_columns.index(second_label)] = 0.3
 
+        # print(image.shape, labels.shape)
         return {
             "image": image,
+            "meta": meta_data,
             "targets": labels
         }
 
-
-class LabelCorrectionDataset(data.Dataset):
-    def __init__(self,
-                 df: pd.DataFrame,
-                 datadir: Path,
-                 soft_label_dir: Path,
-                 img_size=224,
-                 waveform_transforms=None,
-                 spectrogram_transforms=None,
-                 melspectrogram_parameters={},
-                 pcen_parameters={},
-                 period=30,
-                 n_segments=103,
-                 threshold=0.5):
-        self.df = df
-        self.datadir = datadir
-        self.soft_label_dir = soft_label_dir
-        self.img_size = img_size
-        self.waveform_transforms = waveform_transforms
-        self.spectrogram_transforms = spectrogram_transforms
-        self.melspectrogram_parameters = melspectrogram_parameters
-        self.pcen_parameters = pcen_parameters
-        self.period = period
-        self.n_segments = n_segments
-        self.threshold = threshold
-
-    def __len__(self):
-        return len(self.df)
-
-    def __getitem__(self, idx: int):
-        sample = self.df.loc[idx, :]
-        wav_name = sample["resampled_filename"]
-        ebird_code = sample["ebird_code"]
-        secondary_labels = eval(sample["secondary_labels"])
-
-        y, sr = sf.read(self.datadir / ebird_code / wav_name)
-        soft_label = np.load(self.soft_label_dir / (wav_name + ".npy"))
-
-        sec_per_segment = self.period / self.n_segments
-        sec_per_timestep = 1 / sr
-        step_per_segment = int(sec_per_segment / sec_per_timestep)
-
-        len_y = len(y)
-        effective_length = sr * self.period
-        if len_y < effective_length:
-            new_y = np.zeros(effective_length, dtype=y.dtype)
-            max_offset = effective_length - len_y
-
-            offset_id = np.random.randint(0, (max_offset // step_per_segment) + 1)
-            start = offset_id * step_per_segment
-
-            new_y[start:start + len_y] = y
-            y = new_y.astype(np.float32)
-        elif len_y > effective_length:
-            max_offset = len_y - effective_length
-
-            offset_id = np.random.randint(0, (max_offset // step_per_segment) + 1)
-            start = offset_id * step_per_segment
-            y = y[start:start + effective_length].astype(np.float32)
-        else:
-            y = y.astype(np.float32)
-
-        if self.waveform_transforms:
-            y = self.waveform_transforms(y)
-
-        melspec = librosa.feature.melspectrogram(y, sr=sr, **self.melspectrogram_parameters)
-        pcen = librosa.pcen(melspec, sr=sr, **self.pcen_parameters)
-        clean_mel = librosa.power_to_db(melspec ** 1.5)
-        melspec = librosa.power_to_db(melspec)
-
-        if self.spectrogram_transforms:
-            melspec = self.spectrogram_transforms(image=melspec)["image"]
-            pcen = self.spectrogram_transforms(image=pcen)["image"]
-            clean_mel = self.spectrogram_transforms(image=clean_mel)["image"]
-        else:
-            pass
-
-        norm_melspec = normalize_melspec(melspec)
-        norm_pcen = normalize_melspec(pcen)
-        norm_clean_mel = normalize_melspec(clean_mel)
-        image = np.stack([norm_melspec, norm_pcen, norm_clean_mel], axis=-1)
-
-        height, width, _ = image.shape
-        image = cv2.resize(image, (int(width * self.img_size / height), self.img_size))
-        image = np.moveaxis(image, 2, 0)
-        image = (image / 255.0).astype(np.float32)
-
-        labels = np.zeros([self.n_segments, len(BIRD_CODE)], dtype=np.float32)
-
-        if len_y < effective_length:
-            if len(soft_label) + offset_id >= len(labels):
-                n_seg = len(labels[offset_id:, :])
-                labels[offset_id:, :] = soft_label[:n_seg]
-            else:
-                labels[offset_id:offset_id + len(soft_label), :] = soft_label
-        elif len_y > effective_length:
-            use_labels = soft_label[offset_id:offset_id + len(labels)]
-            if len(use_labels) < len(labels):
-                labels[:len(use_labels)] = use_labels
-            else:
-                labels = use_labels
-        else:
-            if len(labels) >= len(soft_label):
-                labels[:len(soft_label)] = soft_label
-            else:
-                labels = soft_label[:len(labels)]
-
-        labels = labels.astype(np.float32)
-
-        weak_labels = np.zeros(len(BIRD_CODE), dtype=int)
-        weak_labels[BIRD_CODE[ebird_code]] = 1
-        for second_label in secondary_labels:
-            if NAME2CODE.get(second_label) is not None:
-                second_code = NAME2CODE[second_label]
-                weak_labels[BIRD_CODE[second_code]] = 1
-        weak_labels_soft = labels.max(axis=0)
-        weak_labels_bin = (weak_labels_soft >= self.threshold).astype(int)
-
-        weak_labels = np.logical_and(weak_labels, weak_labels_bin).astype(int)
-        weak_sum_target = labels.sum(axis=0)
-
-        return {
-            "image": image,
-            "targets": weak_labels,
-            "weak_targets": weak_labels,
-            "weak_sum_targets": weak_sum_target
-        }
 
 class WaveformDataset(data.Dataset):
     def __init__(self,
