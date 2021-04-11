@@ -103,11 +103,11 @@ if __name__ == "__main__":
         logger.info("=" * 20)
         logger.info(f"Fold {i}")
         logger.info("=" * 20)
-        checkpoint = ModelCheckpoint(filepath=f'./fold-{i}')
+        checkpoint = ModelCheckpoint(f'./fold-{i}')
         lightning_model = LightningBirdcall(config, trn_idx, val_idx)
         trainer = pl.Trainer(gpus=1,logger=logger, \
             callbacks=[early_stop_callback, checkpoint], \
-            auto_select_gpus=True, max_epochs=global_params["num_epochs"], accumulate_grad_batches=1 \
+            auto_select_gpus=True, max_epochs=global_params["num_epochs"], accumulate_grad_batches=1 ,\
             limit_val_batches=0.4, gradient_clip_val=1)
         trainer.fit(lightning_model)
         
