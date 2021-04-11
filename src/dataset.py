@@ -621,7 +621,98 @@ class LabelCorrectionDataset(data.Dataset):
             "weak_sum_targets": weak_sum_target
         }
 
+class WaveformDataset(torchdata.Dataset):
+    def __init__(self,
+                 df: pd.DataFrame,
+                 datadir: Path,
+                 spectrogram_transforms,
+                 melspectrogram_parameters,
+                 pcen_parameters,
+                 img_size=224,
+                 waveform_transforms=None,
+                 period=20,
+                 validation=False):
+        self.df = df
+        self.datadir = datadir
+        self.img_size = img_size
+        self.waveform_transforms = waveform_transforms
+        self.period = period
+        self.validation = validation
+        self.spectrogram_transforms = spectrogram_transforms
+        self.melspectrogram_parameters = melspectrogram_parameters
+        self.pcen_parameters = pcen_parameters
 
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, idx: int):
+        sample = self.df.loc[idx, :]
+        wav_name = sample["filename"]
+        ebird_code = sample["primary_label"]
+        secondary_label = eval(sample['secondary_labels'])
+
+        y, sr = sf.read(self.datadir / ebird_code / wav_name)
+
+        len_y = len(y)
+        effective_length = sr * self.period
+        if len_y < effective_length:
+            new_y = np.zeros(effective_length, dtype=y.dtype)
+            if not self.validation:
+                start = np.random.randint(effective_length - len_y)
+            else:
+                start = 0
+            new_y[start:start + len_y] = y
+            y = new_y.astype(np.float32)
+        elif len_y > effective_length:
+            if not self.validation:
+                start = np.random.randint(len_y - effective_length)
+            else:
+                start = 0
+            y = y[start:start + effective_length].astype(np.float32)
+        else:
+            y = y.astype(np.float32)
+
+        y = np.nan_to_num(y)
+
+        if self.waveform_transforms:
+            y = self.waveform_transforms(y)
+
+        y = np.nan_to_num(y)
+        melspec = librosa.feature.melspectrogram(y, sr=sr, **self.melspectrogram_parameters)
+        pcen = librosa.pcen(melspec, sr=sr, **self.pcen_parameters)
+        clean_mel = librosa.power_to_db(melspec ** 1.5)
+        melspec = librosa.power_to_db(melspec)
+
+        if self.spectrogram_transforms:
+            melspec = self.spectrogram_transforms(image=melspec)["image"]
+            pcen = self.spectrogram_transforms(image=pcen)["image"]
+            clean_mel = self.spectrogram_transforms(image=clean_mel)["image"]
+        else:
+            pass
+
+        norm_melspec = normalize_melspec(melspec)
+        norm_pcen = normalize_melspec(pcen)
+        norm_clean_mel = normalize_melspec(clean_mel)
+        image = np.stack([norm_melspec, norm_pcen, norm_clean_mel], axis=-1)
+
+        height, width, _ = image.shape
+        image = cv2.resize(image, (int(width * self.img_size / height), self.img_size))
+        image = np.moveaxis(image, 2, 0)
+        image = (image / 255.0).astype(np.float32)
+        
+
+        labels = np.zeros(len(CFG.target_columns), dtype=float)
+        labels[CFG.target_columns.index(ebird_code)] = 1.0
+        # for second_label in secondary_label:
+        #     labels[CFG.target_columns.index(second_label)] = 0.3
+
+        # print(image.shape, labels.shape)
+        return {
+            "image": image,
+            "targets": labels
+        }
+
+        
 def normalize_melspec(X: np.ndarray):
     eps = 1e-6
     mean = X.mean()
