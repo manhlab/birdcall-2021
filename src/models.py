@@ -31,6 +31,7 @@ import torch.nn.functional as F
 from efficientnet_pytorch import EfficientNet
 from torchlibrosa.stft import Spectrogram, LogmelFilterBank
 from torchlibrosa.augmentation import SpecAugmentation
+from src.Time2vec import *
 
 
 def init_layer(layer):
@@ -474,7 +475,25 @@ class EfficientNetSED(nn.Module):
 
         self.fc1 = nn.Linear(in_features, in_features, bias=True)
         self.att_block = AttBlockV2(in_features, num_classes, activation="sigmoid")
-
+        self.t2v = Time2Vec(self.num_meta, self.meta_emb)
+        self.embedding_size = 1024
+        self.norm = 'GN'
+        self.pooling = 'att'
+        self.dropout = 0.0
+        self.conv_pool_strat = 'max'
+        self.conv_activation = 'relu'
+        self.n_head = 8
+        self.d_k = self.d_v = 128
+        self.dropout_transfo = 128
+        self.num_meta = 5
+        self.meta_emb = 64
+        self.input_n_freq_bins = n_freq_bins = 128
+        self.output_size = num_classes
+        assert self.n_conv_layers % self.n_pool_layers == 0
+        self.self_attention_meta = MultiHead(self.n_head, self.num_meta, self.d_k, self.d_v, self.dropout_transfo)
+        self.self_attention_meta_talnet = MultiHead(self.n_head, self.embedding_size, self.meta_emb, self.meta_emb, self.dropout_transfo)
+        self.fc_prob = Normed_Linear(self.embedding_size + self.meta_emb * self.num_meta, self.output_size)
+        self.pooling_head = Pooling_Head(self.embedding_size + self.meta_emb * self.num_meta, self.output_size, self.pooling)
         self.init_weight()
 
     def init_weight(self):
