@@ -5,7 +5,7 @@ globals:
   output_dir: output/001_ResNestSED_stage2_v1
   main_metric: epoch_mAP
   minimize_metric: False
-  input_key: image
+  input_key: ["image", "meta"]
   input_target_key: targets
   weights:
   folds:
