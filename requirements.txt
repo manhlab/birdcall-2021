@@ -1,0 +1,5 @@
+efficientnet_pytorch
+albumentations==0.5.2
+catalyst==20.12
+timm
+torchlibrosa
