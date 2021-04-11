@@ -21,7 +21,7 @@ data:
   train_soundscape: "/content/train_soundscape_labels.csv"
 
 dataset:
-  name: MultiChannelDataset
+  name: WaveformDataset
   img_size: 224
   params:
     melspectrogram_parameters:

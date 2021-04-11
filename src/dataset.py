@@ -621,7 +621,7 @@ class LabelCorrectionDataset(data.Dataset):
             "weak_sum_targets": weak_sum_target
         }
 
-class WaveformDataset(torchdata.Dataset):
+class WaveformDataset(data.Dataset):
     def __init__(self,
                  df: pd.DataFrame,
                  datadir: Path,
@@ -712,7 +712,7 @@ class WaveformDataset(torchdata.Dataset):
             "targets": labels
         }
 
-        
+
 def normalize_melspec(X: np.ndarray):
     eps = 1e-6
     mean = X.mean()
