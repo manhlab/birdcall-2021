@@ -701,8 +701,8 @@ class WaveformDataset(data.Dataset):
         image = (image / 255.0).astype(np.float32)
         
 
-        labels = np.zeros(len(CFG.target_columns), dtype=float)
-        labels[CFG.target_columns.index(ebird_code)] = 1.0
+        labels = np.zeros(len(BIRD_CODE), dtype=float)
+        labels[BIRD_CODE.index(ebird_code)] = 1.0
         # for second_label in secondary_label:
         #     labels[CFG.target_columns.index(second_label)] = 0.3
 

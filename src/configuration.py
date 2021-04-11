@@ -128,6 +128,26 @@ def get_loader(df: pd.DataFrame,
             period=period,
             n_segments=n_segments,
             threshold=threshold)
+    elif dataset_config["name"] == "WaveformDataset":
+        waveform_transforms = get_waveform_transforms(config, phase)
+        spectrogram_transforms = get_spectrogram_transforms(config, phase)
+        melspectrogram_parameters = dataset_config["params"]["melspectrogram_parameters"]
+        pcen_parameters = dataset_config["params"]["pcen_parameters"]
+        period = dataset_config["params"]["period"][phase]
+        n_segments = dataset_config["params"]["n_segments"][phase]
+        soft_label_dir = Path(dataset_config["params"]["soft_label_dir"])
+        threshold = dataset_config["params"].get("threshold", 0.5)
+        loader_config = config["loader"][phase]
+
+        dataset = datasets.WaveformDataset(
+            df,
+            datadir=datadir,
+            img_size=dataset_config["img_size"],
+            waveform_transforms=waveform_transforms,
+            spectrogram_transforms=spectrogram_transforms,
+            melspectrogram_parameters=melspectrogram_parameters,
+            pcen_parameters=pcen_parameters,
+            period=period)
     else:
         raise NotImplementedError
 
@@ -184,19 +204,19 @@ def get_additional_metadata(config: dict):
 
 def get_metadata(config: dict):
     data_config = config["data"]
-    with open(data_config["train_skip"]) as f:
-        skip_rows = f.readlines()
+    # with open(data_config["train_skip"]) as f:
+    #     skip_rows = f.readlines()
 
-    train = pd.read_csv(data_config["train_df_path"])
-    audio_path = Path(data_config["train_audio_path"])
+    train = pd.read_csv(data_config["train_csv"])
+    audio_path = Path(data_config["train_datadir"])
 
-    for row in skip_rows:
-        row = row.replace("\n", "")
-        ebird_code = row.split("/")[1]
-        filename = row.split("/")[2]
-        train = train[~((train["ebird_code"] == ebird_code) &
-                        (train["filename"] == filename))]
-        train = train.reset_index(drop=True)
+    # for row in skip_rows:
+    #     row = row.replace("\n", "")
+    #     ebird_code = row.split("/")[1]
+    #     filename = row.split("/")[2]
+    #     train = train[~((train["ebird_code"] == ebird_code) &
+    #                     (train["filename"] == filename))]
+    #     train = train.reset_index(drop=True)
 
     if data_config.get("additional_labels") is not None:
         with open(data_config["additional_labels"]) as f:

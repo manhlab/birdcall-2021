@@ -34,7 +34,7 @@ if __name__ == "__main__":
         event_level_labels = None
 
     for i, (trn_idx, val_idx) in enumerate(
-            splitter.split(df, y=df["ebird_code"])):
+            splitter.split(df, y=df["primary_label"])):
         if i not in global_params["folds"]:
             continue
         logger.info("=" * 20)

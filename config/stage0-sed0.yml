@@ -16,8 +16,8 @@ globals:
     - 4
 
 data:
-  train_datadir: Path("/content/train_short_audio")
-  train_csv: Path("/content/train_short_audio")
+  train_datadir: "/content/train_short_audio"
+  train_csv: "/content/train_metadata.csv"
   train_soundscape: "/content/train_soundscape_labels.csv"
 
 dataset:
@@ -37,6 +37,10 @@ dataset:
     period:
       train: 20
       valid: 30
+    n_segments:
+      train: 69
+      valid: 103
+    soft_label_dir: None
 
 transforms:
   train:
@@ -79,16 +83,16 @@ split:
     shuffle: True
 
 model:
-  name: ResNestSED
+  name: EfficientNetSED
   params:
-    base_model_name: resnest50_fast_1s1x64d
+    base_model_name: efficientnet-b0
     pretrained: True
     num_classes: 397
 
 
 loader:
   train:
-    batch_size: 24
+    batch_size: 8
     shuffle: True
     num_workers: 4
   valid:
