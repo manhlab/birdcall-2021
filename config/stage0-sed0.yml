@@ -96,7 +96,7 @@ loader:
     shuffle: True
     num_workers: 4
   valid:
-    batch_size: 32
+    batch_size: 8
     shuffle: False
     num_workers: 4
 

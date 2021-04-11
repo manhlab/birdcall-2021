@@ -389,12 +389,12 @@ class WaveformDataset(data.Dataset):
         labels[BIRD_CODE.index(ebird_code)] = 1.0
         # for second_label in secondary_label:
         #     labels[CFG.target_columns.index(second_label)] = 0.3
-        # return image, meta_data,labels
-        return {
-            "image": torch.tensor(image), 
-            "meta": torch.tensor(meta_data),
-            "targets": torch.tensor(labels)
-        }
+        return image, meta_data,labels
+        # return {
+        #     "image": torch.tensor(image), 
+        #     "meta": torch.tensor(meta_data),
+        #     "targets": torch.tensor(labels)
+        # }
 
 
 class WaveformDatasetX(data.Dataset):

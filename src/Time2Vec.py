@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-import numpy
+import numpy as np
 
 @torch.jit.script
 def mish(input):
