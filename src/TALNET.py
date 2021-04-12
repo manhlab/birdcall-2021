@@ -4,19 +4,19 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
 from src.DCASE_baseline import AutoPool
-from src.Time2vec import *
+from src.Time2Vec import *
 from torchlibrosa.augmentation import SpecAugmentation
 
 class ConvBlock(nn.Module):
     def __init__(self, n_input_feature_maps, n_output_feature_maps, kernel_size, batch_norm = False, pool_stride = None):
         super(ConvBlock, self).__init__()
-        assert all(int(x) % 2 == 1 for x in kernel_size)
+        # assert all(int(x) % 2 == 1 for x in kernel_size)
         self.n_input = n_input_feature_maps
         self.n_output = n_output_feature_maps
         self.kernel_size = kernel_size
         self.batch_norm = batch_norm
         self.pool_stride = pool_stride
-        self.conv = nn.Conv2d(int(self.n_input), int(self.n_output), int(self.kernel_size), padding = tuple(int(int(x)/2) for x in self.kernel_size), bias = ~batch_norm)
+        self.conv = nn.Conv2d(int(self.n_input), int(self.n_output), int(self.kernel_size), padding = (1,1), bias = ~batch_norm)
         if batch_norm: self.bn = nn.BatchNorm2d(int(self.n_output))
         nn.init.xavier_uniform_(self.conv.weight)
 
@@ -519,16 +519,29 @@ class TALNetV2_meta(nn.Module):
         return self.pooling_head(frame_prob, x)
 
 class TALNetV3(nn.Module):
-    def __init__(self, args, num_mels, num_meta, num_classes):
+    def __init__(self, num_mels, num_classes, num_meta, meta_emb=64, n_conv_layers=10, kernel_size=(3,3), n_pool_layers=5,
+        embedding_size=1024, norm='GN', pooling='att', dropout=0.0, conv_pool_strat='max', 
+        conv_activation='relu', n_head=8, d_kv=128, dropout_transfo=0):
         super(TALNetV3, self).__init__()
-        self.__dict__.update(args.__dict__)                       # Install all args into self
-        assert self.n_conv_layers % self.n_pool_layers == 0
+        self.n_conv_layers = n_conv_layers
+        self.kernel_size = kernel_size
+        self.n_pool_layers = n_pool_layers
+        self.embedding_size = embedding_size
+        self.norm = norm
+        self.pooling = pooling
+        self.dropout = dropout
+        self.conv_pool_strat = conv_pool_strat
+        self.conv_activation = conv_activation
+        self.n_head = n_head
+        self.d_k = self.d_v = d_kv
+        self.dropout_transfo = dropout_transfo
+        self.num_meta = num_meta
+        self.meta_emb = meta_emb
         self.input_n_freq_bins = n_freq_bins = num_mels
         self.output_size = num_classes
-        self.num_meta = num_meta
-        self.n_head = self.transfo_head
-        self.d_k = self.d_v = 128
-        self.meta_emb = self.nb_meta_emb
+        self.batch_norm = True
+        self.dropout_AS = 0
+        assert self.n_conv_layers % self.n_pool_layers == 0
         # Conv
         self.conv = []
         self.conv_v2 = []

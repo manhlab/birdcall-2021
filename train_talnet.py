@@ -17,8 +17,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
-from sklearn.metrics import f1_score, average_precision_score
-
+from src.TALNET import TALNetV3
 
 
 class LightningBirdcall(pl.LightningModule):
@@ -26,7 +25,24 @@ class LightningBirdcall(pl.LightningModule):
     def __init__(self, config,trn_idx, val_idx):
         super().__init__()
         self.config = config
-        self.model = models.get_model(config).to(device)
+        # self.model = models.get_model(config).to(device)
+        model_param = {
+         'n_conv_layers':10,
+         'kernel_size':3,
+         'n_pool_layers':5,
+         'embedding_size':1024,
+         'norm':'GN',
+         'conv_pool_strat':'max',
+         'conv_activation':'mish',
+         'pooling':'att',
+         'dropout':0.0,
+         'n_head':8,
+         'd_kv':128,
+         'dropout_transfo':0.0,
+         'meta_emb':128,
+         
+        }
+        self.model = TALNetV3(**model_param, num_mels=64, num_meta=5, num_classes=397)
         self.criterion = C.get_criterion(config).to(device)
         trn_df = df.loc[trn_idx, :].reset_index(drop=True)
         val_df = df.loc[val_idx, :].reset_index(drop=True)
@@ -42,16 +58,15 @@ class LightningBirdcall(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         # training_step defined the train loop. It is independent of forward
         x, meta, y = batch
-        y_hat = self(x, meta)
+        global_prob, frame_prob, frame_att = self(x, meta)
         loss = self.criterion(y_hat, y)
         self.log('train_loss', loss)
-        self.log("map", map_score(y_hat[''],y))
         return loss
 
     def validation_step(self, batch, batch_idx):
         x, meta, y = batch
-        y_hat = self(x, meta)
-        val_loss = self.criterion(y_hat, y)
+        global_prob, frame_prob, frame_att = self(x, meta)
+        val_loss = self.criterion(global_prob, y)
         return val_loss
     def configure_optimizers(self):
         self.optimizer = C.get_optimizer(self.model, self.config)
@@ -61,14 +76,7 @@ class LightningBirdcall(pl.LightningModule):
           return self.loaders['train']
     def val_dataloader(self):
           return self.loaders['valid']
-      
-def map_score(targ, out):
-    targ = targ["clipwise_output"].detach().cpu().numpy()
-    clipwise_output = out.detach().cpu().numpy()
-    score = average_precision_score(targ, clipwise_output, average=None)
-    score = np.nan_to_num(score).mean()
-    return score
-    
+
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
 

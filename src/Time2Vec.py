@@ -33,11 +33,32 @@ class Time2Vec(nn.Module):
       return torch.cat([original,x],-1).view(n_batch,self.output_dim,-1).contiguous()
 
 # Code from official repository : https://github.com/digantamisra98/Mish
+import torch
+from torch import nn
+import torch.nn.functional as F
+
 @torch.jit.script
 def mish(input):
+    '''
+    Applies the mish function element-wise:
+    mish(x) = x * tanh(softplus(x)) = x * tanh(ln(1 + exp(x)))
+    See additional documentation for mish class.
+    '''
     return input * torch.tanh(F.softplus(input))
 
 class Mish(nn.Module):
+    '''
+    Applies the mish function element-wise:
+    mish(x) = x * tanh(softplus(x)) = x * tanh(ln(1 + exp(x)))
+    Shape:
+        - Input: (N, *) where * means, any number of additional
+          dimensions
+        - Output: (N, *), same shape as the input
+    Examples:
+        >>> m = Mish()
+        >>> input = torch.randn(2)
+        >>> output = m(input)
+    '''
     def __init__(self):
         '''
         Init method.
