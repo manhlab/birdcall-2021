@@ -45,7 +45,7 @@ class LightningBirdcall(pl.LightningModule):
         y_hat = self(x, meta)
         loss = self.criterion(y_hat, y)
         self.log('train_loss', loss)
-        with torch.nograd():
+        with torch.no_grad():
           self.log("train_map", map_score(y_hat,y),  prog_bar=True)
         # self.log("f1/0.5", f1_score_threashold(y_hat, y), prog_bar=True)
         return loss
