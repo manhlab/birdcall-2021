@@ -45,7 +45,7 @@ class LightningBirdcall(pl.LightningModule):
         y_hat = self(x, meta)
         loss = self.criterion(y_hat, y)
         self.log('train_loss', loss)
-        self.log("map", map_score(y_hat[''],y))
+        self.log("map", map_score(y_hat,y))
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -61,7 +61,6 @@ class LightningBirdcall(pl.LightningModule):
           return self.loaders['train']
     def val_dataloader(self):
           return self.loaders['valid']
-      
 def map_score(targ, out):
     targ = targ["clipwise_output"].detach().cpu().numpy()
     clipwise_output = out.detach().cpu().numpy()
