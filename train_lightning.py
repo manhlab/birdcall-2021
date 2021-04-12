@@ -18,7 +18,7 @@ from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 from sklearn.metrics import f1_score, average_precision_score
-
+import numpy as np
 
 
 class LightningBirdcall(pl.LightningModule):
@@ -45,13 +45,16 @@ class LightningBirdcall(pl.LightningModule):
         y_hat = self(x, meta)
         loss = self.criterion(y_hat, y)
         self.log('train_loss', loss)
-        self.log("map", map_score(y_hat,y))
+        with torch.nograd():
+          self.log("train_map", map_score(y_hat,y),  prog_bar=True)
+        # self.log("f1/0.5", f1_score_threashold(y_hat, y), prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
         x, meta, y = batch
         y_hat = self(x, meta)
         val_loss = self.criterion(y_hat, y)
+        self.log("val_map", map_score(y_hat,y),  prog_bar=True)
         return val_loss
     def configure_optimizers(self):
         self.optimizer = C.get_optimizer(self.model, self.config)
@@ -64,9 +67,23 @@ class LightningBirdcall(pl.LightningModule):
 def map_score(targ, out):
     targ = targ["clipwise_output"].detach().cpu().numpy()
     clipwise_output = out.detach().cpu().numpy()
-    score = average_precision_score(targ, clipwise_output, average=None)
+    score = average_precision_score(clipwise_output, targ, average=None)
     score = np.nan_to_num(score).mean()
     return score
+def f1_score_threashold(targ, out, threshold=0.5):
+    targ = targ["clipwise_output"].detach().cpu().numpy()
+    clipwise_output = out.detach().cpu().numpy()
+    scores = []
+    for i in range(len(targ[0])):
+        class_i_pred = clipwise_output[:, i] > threshold
+        class_i_targ = targ[:, i]
+        if class_i_targ.sum() == 0 and class_i_pred.sum() == 0:
+            score = 1.0
+        else:
+            score = f1_score(class_i_pred,class_i_targ )
+        scores.append(score)
+
+    return np.mean(scores)
     
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
@@ -85,7 +102,7 @@ if __name__ == "__main__":
     df, datadir = C.get_metadata(config)
     splitter = C.get_split(config)
     early_stop_callback = EarlyStopping(
-      monitor='val_accuracy',
+      monitor='val_map',
       min_delta=0.00,
       patience=3,
       verbose=False,
