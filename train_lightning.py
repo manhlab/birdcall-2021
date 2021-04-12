@@ -70,7 +70,6 @@ if __name__ == "__main__":
 
     output_dir = Path(global_params["output_dir"])
     output_dir.mkdir(exist_ok=True, parents=True)
-    logger = utils.get_logger(output_dir / "output.log")
 
     utils.set_seed(global_params["seed"])
     device = C.get_device(global_params["device"])
@@ -100,10 +99,7 @@ if __name__ == "__main__":
             splitter.split(df, y=df["primary_label"])):
         if i not in global_params["folds"]:
             continue
-        logger.info("=" * 20)
-        logger.info(f"Fold {i}")
-        logger.info("=" * 20)
-        checkpoint = ModelCheckpoint(f'./fold-{i}')
+        checkpoint = ModelCheckpoint(global_params["output_dir"] + f"/fold-{i}")
         lightning_model = LightningBirdcall(config, trn_idx, val_idx)
         trainer = pl.Trainer(gpus=1,logger=logger, \
             callbacks=[early_stop_callback, checkpoint], \

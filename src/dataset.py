@@ -390,12 +390,81 @@ class WaveformDataset(data.Dataset):
         # for second_label in secondary_label:
         #     labels[CFG.target_columns.index(second_label)] = 0.3
         return image, meta_data,labels
-        # return {
-        #     "image": torch.tensor(image), 
-        #     "meta": torch.tensor(meta_data),
-        #     "targets": torch.tensor(labels)
-        # }
 
+class WaveformDatasetTALNET(data.Dataset):
+    def __init__(self,
+                 df: pd.DataFrame,
+                 datadir: Path,
+                 spectrogram_transforms,
+                 melspectrogram_parameters,
+                 pcen_parameters,
+                 img_size=224,
+                 waveform_transforms=None,
+                 period=20,
+                 validation=False):
+        self.df = df
+        self.datadir = datadir
+        self.img_size = img_size
+        self.waveform_transforms = waveform_transforms
+        self.period = period
+        self.validation = validation
+        self.spectrogram_transforms = spectrogram_transforms
+        self.melspectrogram_parameters = melspectrogram_parameters
+        self.pcen_parameters = pcen_parameters
+
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, idx: int):
+        sample = self.df.loc[idx, :]
+        wav_name = sample["filename"]
+        ebird_code = sample["primary_label"]
+        secondary_label = eval(sample['secondary_labels'])
+        meta_data = np.array(sample[['latitude', "longitude"]])
+        data= np.array(list(map(int , sample['date'].split('-'))))
+        meta_data = np.hstack((meta_data, data)).astype(np.float)
+    
+        y, sr = sf.read(self.datadir / ebird_code / wav_name)
+
+        len_y = len(y)
+        effective_length = sr * self.period
+        if len_y < effective_length:
+            new_y = np.zeros(effective_length, dtype=y.dtype)
+            if not self.validation:
+                start = np.random.randint(effective_length - len_y)
+            else:
+                start = 0
+            new_y[start:start + len_y] = y
+            y = new_y.astype(np.float32)
+        elif len_y > effective_length:
+            if not self.validation:
+                start = np.random.randint(len_y - effective_length)
+            else:
+                start = 0
+            y = y[start:start + effective_length].astype(np.float32)
+        else:
+            y = y.astype(np.float32)
+
+        y = np.nan_to_num(y)
+
+        if self.waveform_transforms:
+            y = self.waveform_transforms(y)
+
+        y = np.nan_to_num(y)
+        melspec = librosa.feature.melspectrogram(y, sr=sr, **self.melspectrogram_parameters)
+        melspec = librosa.power_to_db(melspec)
+
+        if self.spectrogram_transforms:
+            melspec = self.spectrogram_transforms(image=melspec)["image"]
+        else:
+            pass
+
+        norm_melspec = normalize_melspec(melspec)
+        labels = np.zeros(len(BIRD_CODE), dtype=float)
+        labels[BIRD_CODE.index(ebird_code)] = 1.0
+        # for second_label in secondary_label:
+        #     labels[CFG.target_columns.index(second_label)] = 0.3
+        return norm_melspec, meta_data,labels
 
 class WaveformDatasetX(data.Dataset):
     def __init__(self,
@@ -467,16 +536,6 @@ class WaveformDatasetX(data.Dataset):
             pass
 
         norm_melspec = normalize_melspec(melspec)
-        norm_pcen = normalize_melspec(pcen)
-        norm_clean_mel = normalize_melspec(clean_mel)
-        image = np.stack([norm_melspec, norm_pcen, norm_clean_mel], axis=-1)
-
-        height, width, _ = image.shape
-        image = cv2.resize(image, (int(width * self.img_size / height), self.img_size))
-        image = np.moveaxis(image, 2, 0)
-        image = (image / 255.0).astype(np.float32)
-        
-
         labels = np.zeros(len(BIRD_CODE), dtype=float)
         labels[BIRD_CODE.index(ebird_code)] = 1.0
         # for second_label in secondary_label:
@@ -484,7 +543,7 @@ class WaveformDatasetX(data.Dataset):
         
         # print(image.shape, labels.shape)
         return {
-            "image": image,
+            "image": norm_melspec,
             "targets": labels
         }
 
