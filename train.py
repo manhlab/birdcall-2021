@@ -33,8 +33,7 @@ if __name__ == "__main__":
     else:
         event_level_labels = None
 
-    for i, (trn_idx, val_idx) in enumerate(
-            splitter.split(df, y=df["primary_label"])):
+    for i, (trn_idx, val_idx) in enumerate(splitter.split(df, y=df["primary_label"])):
         if i not in global_params["folds"]:
             continue
         logger.info("=" * 20)
@@ -57,7 +56,8 @@ if __name__ == "__main__":
         runner = SupervisedRunner(
             device=device,
             input_key=global_params["input_key"],
-            input_target_key=global_params["input_target_key"])
+            input_target_key=global_params["input_target_key"],
+        )
         runner.train(
             model=model,
             criterion=criterion,
@@ -69,4 +69,5 @@ if __name__ == "__main__":
             logdir=output_dir / f"fold{i}",
             callbacks=callbacks,
             main_metric=global_params["main_metric"],
-            minimize_metric=global_params["minimize_metric"])
+            minimize_metric=global_params["minimize_metric"],
+        )

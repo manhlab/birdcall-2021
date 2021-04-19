@@ -22,8 +22,7 @@ import numpy as np
 
 
 class LightningBirdcall(pl.LightningModule):
-
-    def __init__(self, config,trn_idx, val_idx):
+    def __init__(self, config, trn_idx, val_idx):
         super().__init__()
         self.config = config
         self.model = models.get_model(config).to(device)
@@ -35,6 +34,7 @@ class LightningBirdcall(pl.LightningModule):
             phase: C.get_loader(df_, datadir, config, phase, event_level_labels)
             for df_, phase in zip([trn_df, val_df], ["train", "valid"])
         }
+
     def forward(self, img, meta):
         x = self.model(img, meta)
         return x
@@ -44,9 +44,9 @@ class LightningBirdcall(pl.LightningModule):
         x, meta, y = batch
         y_hat = self(x, meta)
         loss = self.criterion(y_hat, y)
-        self.log('train_loss', loss)
+        self.log("train_loss", loss)
         with torch.no_grad():
-          self.log("train_map", map_score(y_hat,y),  prog_bar=True)
+            self.log("train_map", map_score(y_hat, y), prog_bar=True)
         # self.log("f1/0.5", f1_score_threashold(y_hat, y), prog_bar=True)
         return loss
 
@@ -54,22 +54,29 @@ class LightningBirdcall(pl.LightningModule):
         x, meta, y = batch
         y_hat = self(x, meta)
         val_loss = self.criterion(y_hat, y)
-        self.log("val_map", map_score(y_hat,y),  prog_bar=True)
+        self.log("val_map", map_score(y_hat, y), prog_bar=True)
         return val_loss
+
     def configure_optimizers(self):
         self.optimizer = C.get_optimizer(self.model, self.config)
         self.scheduler = C.get_scheduler(self.optimizer, self.config)
         return [self.optimizer], [self.scheduler]
+
     def train_dataloader(self):
-          return self.loaders['train']
+        return self.loaders["train"]
+
     def val_dataloader(self):
-          return self.loaders['valid']
+        return self.loaders["valid"]
+
+
 def map_score(targ, out):
     targ = targ["clipwise_output"].detach().cpu().numpy()
     clipwise_output = out.detach().cpu().numpy()
     score = average_precision_score(clipwise_output, targ, average=None)
     score = np.nan_to_num(score).mean()
     return score
+
+
 def f1_score_threashold(targ, out, threshold=0.5):
     targ = targ["clipwise_output"].detach().cpu().numpy()
     clipwise_output = out.detach().cpu().numpy()
@@ -80,11 +87,12 @@ def f1_score_threashold(targ, out, threshold=0.5):
         if class_i_targ.sum() == 0 and class_i_pred.sum() == 0:
             score = 1.0
         else:
-            score = f1_score(class_i_pred,class_i_targ )
+            score = f1_score(class_i_pred, class_i_targ)
         scores.append(score)
 
     return np.mean(scores)
-    
+
+
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
 
@@ -102,33 +110,28 @@ if __name__ == "__main__":
     df, datadir = C.get_metadata(config)
     splitter = C.get_split(config)
     early_stop_callback = EarlyStopping(
-      monitor='val_map',
-      min_delta=0.00,
-      patience=3,
-      verbose=False,
-      mode='max'
+        monitor="val_map", min_delta=0.00, patience=3, verbose=False, mode="max"
     )
-    logger = TensorBoardLogger(
-        save_dir=os.getcwd(),
-        version=1,
-        name='lightning_logs'
-    )
-    
+    logger = TensorBoardLogger(save_dir=os.getcwd(), version=1, name="lightning_logs")
 
     if config["data"].get("event_level_labels") is not None:
         event_level_labels = C.get_event_level_labels(config)
     else:
         event_level_labels = None
 
-    for i, (trn_idx, val_idx) in enumerate(
-            splitter.split(df, y=df["primary_label"])):
+    for i, (trn_idx, val_idx) in enumerate(splitter.split(df, y=df["primary_label"])):
         if i not in global_params["folds"]:
             continue
         checkpoint = ModelCheckpoint(global_params["output_dir"] + f"/fold-{i}")
         lightning_model = LightningBirdcall(config, trn_idx, val_idx)
-        trainer = pl.Trainer(gpus=1,logger=logger, \
-            callbacks=[early_stop_callback, checkpoint], \
-            auto_select_gpus=True, max_epochs=global_params["num_epochs"], accumulate_grad_batches=1 ,\
-            limit_val_batches=0.4, gradient_clip_val=1)
+        trainer = pl.Trainer(
+            gpus=1,
+            logger=logger,
+            callbacks=[early_stop_callback, checkpoint],
+            auto_select_gpus=True,
+            max_epochs=global_params["num_epochs"],
+            accumulate_grad_batches=1,
+            limit_val_batches=0.4,
+            gradient_clip_val=1,
+        )
         trainer.fit(lightning_model)
-        

@@ -7,11 +7,13 @@ from sklearn.metrics import f1_score, average_precision_score
 
 
 class F1Callback(Callback):
-    def __init__(self,
-                 input_key: str = "targets",
-                 output_key: str = "logits",
-                 model_output_key: str = "clipwise_output",
-                 prefix: str = "f1"):
+    def __init__(
+        self,
+        input_key: str = "targets",
+        output_key: str = "logits",
+        model_output_key: str = "clipwise_output",
+        prefix: str = "f1",
+    ):
         super().__init__(CallbackOrder.Metric)
 
         self.input_key = input_key
@@ -44,19 +46,20 @@ class F1Callback(Callback):
         score = f1_score(y_true, y_pred, average="macro")
         state.loader_metrics[self.prefix] = score
         if state.is_valid_loader:
-            state.epoch_metrics[state.valid_loader + "_epoch_" +
-                                self.prefix] = score
+            state.epoch_metrics[state.valid_loader + "_epoch_" + self.prefix] = score
         else:
             state.epoch_metrics["train_epoch_" + self.prefix] = score
 
 
 class SampleF1Callback(Callback):
-    def __init__(self,
-                 input_key: str = "targets",
-                 output_key: str = "logits",
-                 model_output_key: str = "clipwise_output",
-                 prefix: str = "f1",
-                 threshold=0.5):
+    def __init__(
+        self,
+        input_key: str = "targets",
+        output_key: str = "logits",
+        model_output_key: str = "clipwise_output",
+        prefix: str = "f1",
+        threshold=0.5,
+    ):
         super().__init__(CallbackOrder.Metric)
 
         self.input_key = input_key
@@ -90,19 +93,20 @@ class SampleF1Callback(Callback):
 
         state.loader_metrics[self.prefix] = score
         if state.is_valid_loader:
-            state.epoch_metrics[state.valid_loader + "_epoch_" +
-                                self.prefix] = score
+            state.epoch_metrics[state.valid_loader + "_epoch_" + self.prefix] = score
         else:
             state.epoch_metrics["train_epoch_" + self.prefix] = score
 
 
 class ClasswiseF1Callback(Callback):
-    def __init__(self,
-                 input_key: str = "targets",
-                 output_key: str = "logits",
-                 model_output_key: str = "clipwise_output",
-                 prefix: str = "f1",
-                 threshold=0.5):
+    def __init__(
+        self,
+        input_key: str = "targets",
+        output_key: str = "logits",
+        model_output_key: str = "clipwise_output",
+        prefix: str = "f1",
+        threshold=0.5,
+    ):
         super().__init__(CallbackOrder.Metric)
 
         self.input_key = input_key
@@ -152,18 +156,21 @@ class ClasswiseF1Callback(Callback):
 
         state.loader_metrics[self.prefix] = np.mean(scores)
         if state.is_valid_loader:
-            state.epoch_metrics[state.valid_loader + "_epoch_" +
-                                self.prefix] = np.mean(scores)
+            state.epoch_metrics[state.valid_loader + "_epoch_" + self.prefix] = np.mean(
+                scores
+            )
         else:
             state.epoch_metrics["train_epoch_" + self.prefix] = np.mean(scores)
 
 
 class mAPCallback(Callback):
-    def __init__(self,
-                 input_key: str = "targets",
-                 output_key: str = "logits",
-                 model_output_key: str = "clipwise_output",
-                 prefix: str = "mAP"):
+    def __init__(
+        self,
+        input_key: str = "targets",
+        output_key: str = "logits",
+        model_output_key: str = "clipwise_output",
+        prefix: str = "mAP",
+    ):
         super().__init__(CallbackOrder.Metric)
         self.input_key = input_key
         self.output_key = output_key
@@ -194,8 +201,7 @@ class mAPCallback(Callback):
         score = np.nan_to_num(score).mean()
         state.loader_metrics[self.prefix] = score
         if state.is_valid_loader:
-            state.epoch_metrics[state.valid_loader + "_epoch_" +
-                                self.prefix] = score
+            state.epoch_metrics[state.valid_loader + "_epoch_" + self.prefix] = score
         else:
             state.epoch_metrics["train_epoch_" + self.prefix] = score
 

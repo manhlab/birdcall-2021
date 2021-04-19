@@ -39,11 +39,11 @@ def init_layer(layer):
 
     if hasattr(layer, "bias"):
         if layer.bias is not None:
-            layer.bias.data.fill_(0.)
+            layer.bias.data.fill_(0.0)
 
 
 def init_bn(bn):
-    bn.bias.data.fill_(0.)
+    bn.bias.data.fill_(0.0)
     bn.weight.data.fill_(1.0)
 
 
@@ -73,15 +73,16 @@ def do_mixup(x: torch.Tensor, mixup_lambda: torch.Tensor):
     Returns:
       out: (batch_size, ...)
     """
-    out = (x[0::2].transpose(0, -1) * mixup_lambda[0::2] +
-           x[1::2].transpose(0, -1) * mixup_lambda[1::2]).transpose(0, -1)
+    out = (
+        x[0::2].transpose(0, -1) * mixup_lambda[0::2]
+        + x[1::2].transpose(0, -1) * mixup_lambda[1::2]
+    ).transpose(0, -1)
     return out
 
 
 class Mixup(object):
     def __init__(self, mixup_alpha, random_seed=1234):
-        """Mixup coefficient generator.
-        """
+        """Mixup coefficient generator."""
         self.mixup_alpha = mixup_alpha
         self.random_state = np.random.RandomState(random_seed)
 
@@ -96,7 +97,7 @@ class Mixup(object):
         for n in range(0, batch_size, 2):
             lam = self.random_state.beta(self.mixup_alpha, self.mixup_alpha, 1)[0]
             mixup_lambdas.append(lam)
-            mixup_lambdas.append(1. - lam)
+            mixup_lambdas.append(1.0 - lam)
 
         return torch.from_numpy(np.array(mixup_lambdas, dtype=np.float32))
 
@@ -126,7 +127,8 @@ def pad_framewise_output(framewise_output: torch.Tensor, frames_num: int):
       output: (batch_size, frames_num, classes_num)
     """
     pad = framewise_output[:, -1:, :].repeat(
-        1, frames_num - framewise_output.shape[1], 1)
+        1, frames_num - framewise_output.shape[1], 1
+    )
     """tensor for padding"""
 
     output = torch.cat((framewise_output, pad), dim=1)
@@ -145,7 +147,8 @@ class ConvBlock(nn.Module):
             kernel_size=(3, 3),
             stride=(1, 1),
             padding=(1, 1),
-            bias=False)
+            bias=False,
+        )
 
         self.conv2 = nn.Conv2d(
             in_channels=out_channels,
@@ -153,7 +156,8 @@ class ConvBlock(nn.Module):
             kernel_size=(3, 3),
             stride=(1, 1),
             padding=(1, 1),
-            bias=False)
+            bias=False,
+        )
 
         self.bn1 = nn.BatchNorm2d(out_channels)
         self.bn2 = nn.BatchNorm2d(out_channels)
@@ -166,31 +170,29 @@ class ConvBlock(nn.Module):
         init_bn(self.bn1)
         init_bn(self.bn2)
 
-    def forward(self, input, pool_size=(2, 2), pool_type='avg'):
+    def forward(self, input, pool_size=(2, 2), pool_type="avg"):
 
         x = input
         x = F.relu_(self.bn1(self.conv1(x)))
         x = F.relu_(self.bn2(self.conv2(x)))
-        if pool_type == 'max':
+        if pool_type == "max":
             x = F.max_pool2d(x, kernel_size=pool_size)
-        elif pool_type == 'avg':
+        elif pool_type == "avg":
             x = F.avg_pool2d(x, kernel_size=pool_size)
-        elif pool_type == 'avg+max':
+        elif pool_type == "avg+max":
             x1 = F.avg_pool2d(x, kernel_size=pool_size)
             x2 = F.max_pool2d(x, kernel_size=pool_size)
             x = x1 + x2
         else:
-            raise Exception('Incorrect argument!')
+            raise Exception("Incorrect argument!")
 
         return x
 
 
 class AttBlock(nn.Module):
-    def __init__(self,
-                 in_features: int,
-                 out_features: int,
-                 activation="linear",
-                 temperature=1.0):
+    def __init__(
+        self, in_features: int, out_features: int, activation="linear", temperature=1.0
+    ):
         super().__init__()
 
         self.activation = activation
@@ -201,14 +203,16 @@ class AttBlock(nn.Module):
             kernel_size=1,
             stride=1,
             padding=0,
-            bias=True)
+            bias=True,
+        )
         self.cla = nn.Conv1d(
             in_channels=in_features,
             out_channels=out_features,
             kernel_size=1,
             stride=1,
             padding=0,
-            bias=True)
+            bias=True,
+        )
 
         self.bn_att = nn.BatchNorm1d(out_features)
         self.init_weights()
@@ -226,17 +230,14 @@ class AttBlock(nn.Module):
         return x, norm_att, cla
 
     def nonlinear_transform(self, x):
-        if self.activation == 'linear':
+        if self.activation == "linear":
             return x
-        elif self.activation == 'sigmoid':
+        elif self.activation == "sigmoid":
             return torch.sigmoid(x)
 
 
 class AttBlockV2(nn.Module):
-    def __init__(self,
-                 in_features: int,
-                 out_features: int,
-                 activation="linear"):
+    def __init__(self, in_features: int, out_features: int, activation="linear"):
         super().__init__()
 
         self.activation = activation
@@ -246,14 +247,16 @@ class AttBlockV2(nn.Module):
             kernel_size=1,
             stride=1,
             padding=0,
-            bias=True)
+            bias=True,
+        )
         self.cla = nn.Conv1d(
             in_channels=in_features,
             out_channels=out_features,
             kernel_size=1,
             stride=1,
             padding=0,
-            bias=True)
+            bias=True,
+        )
 
         self.init_weights()
 
@@ -269,20 +272,28 @@ class AttBlockV2(nn.Module):
         return x, norm_att, cla
 
     def nonlinear_transform(self, x):
-        if self.activation == 'linear':
+        if self.activation == "linear":
             return x
-        elif self.activation == 'sigmoid':
+        elif self.activation == "sigmoid":
             return torch.sigmoid(x)
 
 
 class PANNsCNN14Att(nn.Module):
-    def __init__(self, sample_rate: int, window_size: int, hop_size: int,
-                 mel_bins: int, fmin: int, fmax: int, classes_num: int):
+    def __init__(
+        self,
+        sample_rate: int,
+        window_size: int,
+        hop_size: int,
+        mel_bins: int,
+        fmin: int,
+        fmax: int,
+        classes_num: int,
+    ):
         super().__init__()
 
-        window = 'hann'
+        window = "hann"
         center = True
-        pad_mode = 'reflect'
+        pad_mode = "reflect"
         ref = 1.0
         amin = 1e-10
         top_db = None
@@ -296,7 +307,8 @@ class PANNsCNN14Att(nn.Module):
             window=window,
             center=center,
             pad_mode=pad_mode,
-            freeze_parameters=True)
+            freeze_parameters=True,
+        )
 
         # Logmel feature extractor
         self.logmel_extractor = LogmelFilterBank(
@@ -308,14 +320,16 @@ class PANNsCNN14Att(nn.Module):
             ref=ref,
             amin=amin,
             top_db=top_db,
-            freeze_parameters=True)
+            freeze_parameters=True,
+        )
 
         # Spec augmenter
         self.spec_augmenter = SpecAugmentation(
             time_drop_width=64,
             time_stripes_num=2,
             freq_drop_width=8,
-            freq_stripes_num=2)
+            freq_stripes_num=2,
+        )
 
         self.bn0 = nn.BatchNorm2d(mel_bins)
 
@@ -327,7 +341,7 @@ class PANNsCNN14Att(nn.Module):
         self.conv_block6 = ConvBlock(in_channels=1024, out_channels=2048)
 
         self.fc1 = nn.Linear(2048, 2048, bias=True)
-        self.att_block = AttBlock(2048, classes_num, activation='sigmoid')
+        self.att_block = AttBlock(2048, classes_num, activation="sigmoid")
 
         self.init_weight()
 
@@ -340,8 +354,7 @@ class PANNsCNN14Att(nn.Module):
         Input: (batch_size, data_length)"""
 
         # t1 = time.time()
-        x = self.spectrogram_extractor(
-            input)  # (batch_size, 1, time_steps, freq_bins)
+        x = self.spectrogram_extractor(input)  # (batch_size, 1, time_steps, freq_bins)
         x = self.logmel_extractor(x)  # (batch_size, 1, time_steps, mel_bins)
 
         frames_num = x.shape[2]
@@ -357,17 +370,17 @@ class PANNsCNN14Att(nn.Module):
         if self.training and mixup_lambda is not None:
             x = do_mixup(x, mixup_lambda)
 
-        x = self.conv_block1(x, pool_size=(2, 2), pool_type='avg')
+        x = self.conv_block1(x, pool_size=(2, 2), pool_type="avg")
         x = F.dropout(x, p=0.2, training=self.training)
-        x = self.conv_block2(x, pool_size=(2, 2), pool_type='avg')
+        x = self.conv_block2(x, pool_size=(2, 2), pool_type="avg")
         x = F.dropout(x, p=0.2, training=self.training)
-        x = self.conv_block3(x, pool_size=(2, 2), pool_type='avg')
+        x = self.conv_block3(x, pool_size=(2, 2), pool_type="avg")
         x = F.dropout(x, p=0.2, training=self.training)
-        x = self.conv_block4(x, pool_size=(2, 2), pool_type='avg')
+        x = self.conv_block4(x, pool_size=(2, 2), pool_type="avg")
         x = F.dropout(x, p=0.2, training=self.training)
-        x = self.conv_block5(x, pool_size=(2, 2), pool_type='avg')
+        x = self.conv_block5(x, pool_size=(2, 2), pool_type="avg")
         x = F.dropout(x, p=0.2, training=self.training)
-        x = self.conv_block6(x, pool_size=(1, 1), pool_type='avg')
+        x = self.conv_block6(x, pool_size=(1, 1), pool_type="avg")
         x = F.dropout(x, p=0.2, training=self.training)
         x = torch.mean(x, dim=3)
 
@@ -384,27 +397,25 @@ class PANNsCNN14Att(nn.Module):
         segmentwise_output = segmentwise_output.transpose(1, 2)
 
         # Get framewise output
-        framewise_output = interpolate(segmentwise_output,
-                                       self.interpolate_ratio)
+        framewise_output = interpolate(segmentwise_output, self.interpolate_ratio)
         framewise_output = pad_framewise_output(framewise_output, frames_num)
 
         output_dict = {
-            'framewise_output': framewise_output,
+            "framewise_output": framewise_output,
             "logit": logit,
-            'clipwise_output': clipwise_output
+            "clipwise_output": clipwise_output,
         }
 
         return output_dict
 
 
 class ResNestSED(nn.Module):
-    def __init__(self, base_model_name: str, pretrained=False,
-                 num_classes=264):
+    def __init__(self, base_model_name: str, pretrained=False, num_classes=264):
         super().__init__()
         self.interpolate_ratio = 30  # Downsampled ratio
-        base_model = torch.hub.load("zhanghang1989/ResNeSt",
-                                    base_model_name,
-                                    pretrained=pretrained)
+        base_model = torch.hub.load(
+            "zhanghang1989/ResNeSt", base_model_name, pretrained=pretrained
+        )
         layers = list(base_model.children())[:-2]
         self.encoder = nn.Sequential(*layers)
 
@@ -443,8 +454,7 @@ class ResNestSED(nn.Module):
         segmentwise_output = segmentwise_output.transpose(1, 2)
 
         # Get framewise output
-        framewise_output = interpolate(segmentwise_output,
-                                       self.interpolate_ratio)
+        framewise_output = interpolate(segmentwise_output, self.interpolate_ratio)
         framewise_output = pad_framewise_output(framewise_output, frames_num)
 
         framewise_logit = interpolate(segmentwise_logit, self.interpolate_ratio)
@@ -455,15 +465,14 @@ class ResNestSED(nn.Module):
             "segmentwise_output": segmentwise_output,
             "logit": logit,
             "framewise_logit": framewise_logit,
-            "clipwise_output": clipwise_output
+            "clipwise_output": clipwise_output,
         }
 
         return output_dict
 
 
 class EfficientNetSED(nn.Module):
-    def __init__(self, base_model_name: str, pretrained=False,
-                 num_classes=264):
+    def __init__(self, base_model_name: str, pretrained=False, num_classes=264):
         super().__init__()
         self.interpolate_ratio = 30  # Downsampled ratio
         if pretrained:
@@ -505,8 +514,7 @@ class EfficientNetSED(nn.Module):
         segmentwise_output = segmentwise_output.transpose(1, 2)
 
         # Get framewise output
-        framewise_output = interpolate(segmentwise_output,
-                                       self.interpolate_ratio)
+        framewise_output = interpolate(segmentwise_output, self.interpolate_ratio)
         framewise_output = pad_framewise_output(framewise_output, frames_num)
 
         framewise_logit = interpolate(segmentwise_logit, self.interpolate_ratio)
@@ -517,7 +525,7 @@ class EfficientNetSED(nn.Module):
             "segmentwise_output": segmentwise_output,
             "logit": logit,
             "framewise_logit": framewise_logit,
-            "clipwise_output": clipwise_output
+            "clipwise_output": clipwise_output,
         }
 
         return output_dict
@@ -537,12 +545,14 @@ def get_model(config: dict):
                 mel_bins=64,
                 fmin=50,
                 fmax=14000,
-                classes_num=527)
+                classes_num=527,
+            )
             checkpoint = torch.load("pretrained/PANNsCNN14Att.pth")
             model.load_state_dict(checkpoint["model"])
 
             model.att_block = AttBlock(
-                2048, model_params["n_classes"], activation="sigmoid")
+                2048, model_params["n_classes"], activation="sigmoid"
+            )
             model.att_block.init_weights()
             init_layer(model.fc1)
         else:
@@ -553,15 +563,14 @@ def get_model(config: dict):
                 mel_bins=model_params["mel_bins"],
                 fmin=model_params["fmin"],
                 fmax=model_params["fmax"],
-                classes_num=model_params["n_classes"])
+                classes_num=model_params["n_classes"],
+            )
         return model
     elif model_name == "ResNestSED":
-        model = ResNestSED(  # type: ignore
-            **model_params)
+        model = ResNestSED(**model_params)  # type: ignore
         return model
     elif model_name == "EfficientNetSED":
-        model = EfficientNetSED(  # type: ignore
-            **model_params)
+        model = EfficientNetSED(**model_params)  # type: ignore
         return model
     else:
         raise NotImplementedError
@@ -581,7 +590,7 @@ def get_model_for_inference(config: dict, weights_dir: str):
                 "mel_bins": 64,
                 "fmin": 50,
                 "fmax": 14000,
-                "classes_num": model_params["n_classes"]
+                "classes_num": model_params["n_classes"],
             }
             model = PANNsCNN14Att(**params)  # type: ignore
         else:
@@ -592,12 +601,14 @@ def get_model_for_inference(config: dict, weights_dir: str):
                 mel_bins=model_params["mel_bins"],
                 fmin=model_params["fmin"],
                 fmax=model_params["fmax"],
-                classes_num=model_params["n_classes"])
+                classes_num=model_params["n_classes"],
+            )
     elif model_name == "ResNestSED":
         model = ResNestSED(  # type: ignore
             base_model_name=model_params["base_model_name"],
             pretrained=False,
-            num_classes=model_params["num_classes"])
+            num_classes=model_params["num_classes"],
+        )
     else:
         raise NotImplementedError
 

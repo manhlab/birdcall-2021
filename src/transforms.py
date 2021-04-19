@@ -7,7 +7,7 @@ from albumentations.core.transforms_interface import ImageOnlyTransform
 
 
 def get_transforms(config: dict, phase: str):
-    transforms = config.get('transforms')
+    transforms = config.get("transforms")
     if transforms is None:
         return None
     else:
@@ -16,8 +16,7 @@ def get_transforms(config: dict, phase: str):
         trns_list = []
         for trns_conf in transforms[phase]:
             trns_name = trns_conf["name"]
-            trns_params = {} if trns_conf.get("params") is None else \
-                trns_conf["params"]
+            trns_params = {} if trns_conf.get("params") is None else trns_conf["params"]
             if globals().get(trns_name) is not None:
                 trns_cls = globals()[trns_name]
                 trns_list.append(trns_cls(**trns_params))
@@ -33,7 +32,7 @@ def get_waveform_transforms(config: dict, phase: str):
 
 
 def get_spectrogram_transforms(config: dict, phase: str):
-    transforms = config.get('spectrogram_transforms')
+    transforms = config.get("spectrogram_transforms")
     if transforms is None:
         return None
     else:
@@ -42,8 +41,7 @@ def get_spectrogram_transforms(config: dict, phase: str):
         trns_list = []
         for trns_conf in transforms[phase]:
             trns_name = trns_conf["name"]
-            trns_params = {} if trns_conf.get("params") is None else \
-                trns_conf["params"]
+            trns_params = {} if trns_conf.get("params") is None else trns_conf["params"]
             if hasattr(A, trns_name):
                 trns_cls = A.__getattribute__(trns_name)
                 trns_list.append(trns_cls(**trns_params))
@@ -177,7 +175,7 @@ class TimeStretch(AudioTransform):
 
 def _db2float(db: float, amplitude=True):
     if amplitude:
-        return 10**(db / 20)
+        return 10 ** (db / 20)
     else:
         return 10 ** (db / 10)
 
@@ -263,7 +261,7 @@ def drop_stripes(image: np.ndarray, dim: int, drop_width: int, stripes_num: int)
         begin = np.random.randint(low=0, high=total_width - distance, size=(1,))[0]
 
         if dim == 0:
-            image[begin:begin + distance] = lowest_value
+            image[begin : begin + distance] = lowest_value
         elif dim == 1:
             image[:, begin + distance] = lowest_value
         elif dim == 2:
@@ -272,13 +270,15 @@ def drop_stripes(image: np.ndarray, dim: int, drop_width: int, stripes_num: int)
 
 
 class TimeFreqMasking(ImageOnlyTransform):
-    def __init__(self,
-                 time_drop_width: int,
-                 time_stripes_num: int,
-                 freq_drop_width: int,
-                 freq_stripes_num: int,
-                 always_apply=False,
-                 p=0.5):
+    def __init__(
+        self,
+        time_drop_width: int,
+        time_stripes_num: int,
+        freq_drop_width: int,
+        freq_stripes_num: int,
+        always_apply=False,
+        p=0.5,
+    ):
         super().__init__(always_apply, p)
         self.time_drop_width = time_drop_width
         self.time_stripes_num = time_stripes_num
@@ -288,6 +288,16 @@ class TimeFreqMasking(ImageOnlyTransform):
     def apply(self, img, **params):
         img_ = img.copy()
         if img.ndim == 2:
-            img_ = drop_stripes(img_, dim=0, drop_width=self.freq_drop_width, stripes_num=self.freq_stripes_num)
-            img_ = drop_stripes(img_, dim=1, drop_width=self.time_drop_width, stripes_num=self.time_stripes_num)
+            img_ = drop_stripes(
+                img_,
+                dim=0,
+                drop_width=self.freq_drop_width,
+                stripes_num=self.freq_stripes_num,
+            )
+            img_ = drop_stripes(
+                img_,
+                dim=1,
+                drop_width=self.time_drop_width,
+                stripes_num=self.time_stripes_num,
+            )
         return img_
