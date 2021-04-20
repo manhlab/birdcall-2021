@@ -1,0 +1,108 @@
+globals:
+  seed: 1213
+  device: cuda
+  num_epochs: 75
+  output_dir: output/001_ResNestSED_stage2_v1
+  main_metric: epoch_mAP
+  minimize_metric: False
+  input_key: ["image", "meta"]
+  input_target_key: targets
+  weights:
+  folds:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+
+data:
+  train_datadir: "/content/audio_images"
+  train_csv: "/content/rich_train_metadata.csv"
+  train_soundscape: "/content/birdcall-2021/dataset/train_soundscape_labels.csv"
+
+dataset:
+  name: WaveformDatasetKkiller
+  img_size: 128
+  params:
+    melspectrogram_parameters:
+      n_mels: 64
+      fmin: 50
+      fmax: 14000
+    pcen_parameters:
+      gain: 0.98
+      bias: 2
+      power: 0.5
+      time_constant: 0.4
+      eps: 0.000001
+    period:
+      train: 20
+      valid: 30
+    n_segments:
+      train: 69
+      valid: 103
+    soft_label_dir: None
+
+transforms:
+  train:
+    - name: NoiseInjection
+      params:
+        max_noise_level: 0.04
+    - name: PitchShift
+      params:
+        max_range: 3
+    - name: RandomVolume
+      params:
+        limit: 4
+    - name: Normalize
+  valid:
+    - name: Normalize
+
+loss:
+  name: ImprovedPANNsLoss
+  params:
+    output_key: clipwise_output
+    weights:
+      - 1.0
+      - 0.5
+
+optimizer:
+  name: Adam
+  params:
+    lr: 0.001
+
+scheduler:
+  name: CosineAnnealingLR
+  params:
+    T_max: 10
+
+split:
+  name: StratifiedKFold
+  params:
+    n_splits: 5
+    random_state: 42
+    shuffle: True
+
+model:
+  name: EfficientNetSED
+  params:
+    base_model_name: efficientnet-b0
+    pretrained: True
+    num_classes: 397
+
+
+loader:
+  train:
+    batch_size: 64
+    shuffle: True
+    num_workers: 4
+  valid:
+    batch_size: 64
+    shuffle: False
+    num_workers: 4
+
+callbacks:
+  - name: mAPCallback
+    params:
+      input_key: targets
+      output_key: logits
+      prefix: mAP

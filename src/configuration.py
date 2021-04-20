@@ -87,33 +87,7 @@ def get_loader(
         loader_config = config["loader"][phase]
 
         dataset = datasets.PANNsDataset(df, datadir=datadir, transforms=transforms)
-    elif dataset_config["name"] == "PANNsMultiLabelDataset":
-        transforms = get_transforms(config, phase)
-        loader_config = config["loader"][phase]
-        period = dataset_config["params"][phase]["period"]
-        dataset = datasets.PANNsMultiLabelDataset(
-            df, datadir=datadir, transforms=transforms, period=period
-        )
-    elif dataset_config["name"] == "MultiChannelDataset":
-        waveform_transforms = get_waveform_transforms(config, phase)
-        spectrogram_transforms = get_spectrogram_transforms(config, phase)
-        melspectrogram_parameters = dataset_config["params"][
-            "melspectrogram_parameters"
-        ]
-        pcen_parameters = dataset_config["params"]["pcen_parameters"]
-        period = dataset_config["params"]["period"][phase]
-        loader_config = config["loader"][phase]
-
-        dataset = datasets.MultiChannelDataset(
-            df,
-            datadir=datadir,
-            img_size=dataset_config["img_size"],
-            waveform_transforms=waveform_transforms,
-            spectrogram_transforms=spectrogram_transforms,
-            melspectrogram_parameters=melspectrogram_parameters,
-            pcen_parameters=pcen_parameters,
-            period=period,
-        )
+    
     elif dataset_config["name"] == "WaveformDatasetKkiller":
         waveform_transforms = get_waveform_transforms(config, phase)
         spectrogram_transforms = get_spectrogram_transforms(config, phase)
@@ -127,7 +101,7 @@ def get_loader(
         threshold = dataset_config["params"].get("threshold", 0.5)
         loader_config = config["loader"][phase]
 
-        dataset = datasets.WaveformDataset(
+        dataset = datasets.WaveformDatasetKkiller(
             df,
             datadir=datadir,
             img_size=dataset_config["img_size"],

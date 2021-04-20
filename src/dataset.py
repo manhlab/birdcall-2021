@@ -499,9 +499,10 @@ class WaveformDataset(data.Dataset):
 
         labels = np.zeros(len(BIRD_CODE), dtype=float)
         labels[BIRD_CODE.index(ebird_code)] = 1.0
-        # for second_label in secondary_label:
-        #     labels[CFG.target_columns.index(second_label)] = 0.3
-        return image, meta_data, labels
+        labels_w_secondary = labels
+        for second_label in secondary_label:
+            labels_w_secondary[BIRD_CODE.index(second_label)] = 0.3
+        return image, meta_data, labels, labels_w_secondary
 
 
 
@@ -540,7 +541,7 @@ class WaveformDatasetKkiller(data.Dataset):
         data = np.array(list(map(int, sample["date"].split("-"))))
         meta_data = np.hstack((meta_data, data)).astype(np.float)
         sr = 32000
-        image = torch.load(self.datadir / ebird_code / f"{wav_name}.npy")
+        image = np.load(self.datadir / ebird_code / f"{wav_name}.npy")
         randomk = np.random.randint(image.shape[0])
         image = image[randomk, :, :]
         image = np.stack([image, image, image], axis=-1)
@@ -548,9 +549,12 @@ class WaveformDatasetKkiller(data.Dataset):
         image = (image / 255.0).astype(np.float32)
         labels = np.zeros(len(BIRD_CODE), dtype=float)
         labels[BIRD_CODE.index(ebird_code)] = 1.0
-        # for second_label in secondary_label:
-        #     labels[CFG.target_columns.index(second_label)] = 0.3
-        return image, meta_data, labels
+        labels_w_secondary = labels
+        for second_label in secondary_label:
+          if second_label in BIRD_CODE:
+            labels_w_secondary[BIRD_CODE.index(second_label)] = 0.3
+        labels_w_secondary = labels_w_secondary.astype(np.float)
+        return image, meta_data, labels, labels_w_secondary
 
 
 class WaveformDatasetTALNET(data.Dataset):

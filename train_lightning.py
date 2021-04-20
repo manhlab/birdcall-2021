@@ -40,20 +40,22 @@ class LightningBirdcall(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         # training_step defined the train loop. It is independent of forward
-        x, meta, y = batch
-        y_hat = self(x, meta)
-        loss = self.criterion(y_hat, y)
+        image, meta_data, labels, labels_w_secondary = batch
+        y_hat = self(image, meta_data)
+        loss = self.criterion(y_hat, labels_w_secondary)
         self.log("train_loss", loss)
         with torch.no_grad():
-            self.log("train_map", utils.map_score(y_hat, y), prog_bar=True)
-        # self.log("f1/0.5", f1_score_threashold(y_hat, y), prog_bar=True)
+            self.log("train_map", utils.map_score(y_hat, labels), prog_bar=True)
+            self.log("f1/0.5", utils.f1_score_threashold(y_hat, labels), prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        x, meta, y = batch
-        y_hat = self(x, meta)
-        val_loss = self.criterion(y_hat, y)
-        self.log("val_map", utils.map_score(y_hat, y), prog_bar=True)
+        image, meta_data, labels, labels_w_secondary = batch
+        y_hat = self(image, meta_data)
+        val_loss = self.criterion(y_hat, labels_w_secondary)
+        self.log("val_losss", val_loss)
+        # print(labels)
+        self.log("val_map", utils.map_score(y_hat, labels), prog_bar=True)
         return val_loss
 
     def configure_optimizers(self):
@@ -95,7 +97,7 @@ if __name__ == "__main__":
             continue
         checkpoint = ModelCheckpoint(global_params["output_dir"] + f"/fold-{i}")
         early_stop_callback = EarlyStopping(
-        monitor="val_map", min_delta=0.00, patience=3, verbose=False, mode="max"
+        monitor="val_map", min_delta=0.00, patience=10, verbose=False, mode="max"
         )
         logger = TensorBoardLogger(save_dir=os.getcwd(), version=1, name="lightning_logs")
 
@@ -107,7 +109,6 @@ if __name__ == "__main__":
             auto_select_gpus=True,
             max_epochs=global_params["num_epochs"],
             accumulate_grad_batches=1,
-            limit_val_batches=0.4,
             gradient_clip_val=1,
         )
         trainer.fit(lightning_model)
