@@ -13,6 +13,7 @@ import yaml
 from contextlib import contextmanager
 from typing import Union, Optional
 from pathlib import Path
+from sklearn.metrics import f1_score, average_precision_score
 
 
 class MyEncoder(json.JSONEncoder):
@@ -96,3 +97,25 @@ def load_config(path: str):
     with open(path) as f:
         config = yaml.safe_load(f)
     return config
+def map_score(targ, out):
+    targ = targ["clipwise_output"].detach().cpu().numpy()
+    clipwise_output = out.detach().cpu().numpy()
+    score = average_precision_score(clipwise_output, targ, average=None)
+    score = np.nan_to_num(score).mean()
+    return score
+
+
+def f1_score_threashold(targ, out, threshold=0.5):
+    targ = targ["clipwise_output"].detach().cpu().numpy()
+    clipwise_output = out.detach().cpu().numpy()
+    scores = []
+    for i in range(len(targ[0])):
+        class_i_pred = clipwise_output[:, i] > threshold
+        class_i_targ = targ[:, i]
+        if class_i_targ.sum() == 0 and class_i_pred.sum() == 0:
+            score = 1.0
+        else:
+            score = f1_score(class_i_pred, class_i_targ)
+        scores.append(score)
+
+    return np.mean(scores)
