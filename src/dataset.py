@@ -471,38 +471,12 @@ class WaveformDataset(data.Dataset):
 
         if self.waveform_transforms:
             y = self.waveform_transforms(y)
-
-        y = np.nan_to_num(y)
-        melspec = librosa.feature.melspectrogram(
-            y, sr=sr, **self.melspectrogram_parameters
-        )
-        pcen = librosa.pcen(melspec, sr=sr, **self.pcen_parameters)
-        clean_mel = librosa.power_to_db(melspec ** 1.5)
-        melspec = librosa.power_to_db(melspec)
-
-        if self.spectrogram_transforms:
-            melspec = self.spectrogram_transforms(image=melspec)["image"]
-            pcen = self.spectrogram_transforms(image=pcen)["image"]
-            clean_mel = self.spectrogram_transforms(image=clean_mel)["image"]
-        else:
-            pass
-
-        norm_melspec = normalize_melspec(melspec)
-        norm_pcen = normalize_melspec(pcen)
-        norm_clean_mel = normalize_melspec(clean_mel)
-        image = np.stack([norm_melspec, norm_pcen, norm_clean_mel], axis=-1)
-
-        height, width, _ = image.shape
-        image = cv2.resize(image, (int(width * self.img_size / height), self.img_size))
-        image = np.moveaxis(image, 2, 0)
-        image = (image / 255.0).astype(np.float32)
-
         labels = np.zeros(len(BIRD_CODE), dtype=float)
         labels[BIRD_CODE.index(ebird_code)] = 1.0
         labels_w_secondary = labels
         for second_label in secondary_label:
             labels_w_secondary[BIRD_CODE.index(second_label)] = 0.3
-        return image, meta_data, labels, labels_w_secondary
+        return y, meta_data, labels, labels_w_secondary
 
 
 

@@ -32,7 +32,7 @@ from efficientnet_pytorch import EfficientNet
 from torchlibrosa.stft import Spectrogram, LogmelFilterBank
 from torchlibrosa.augmentation import SpecAugmentation
 from src.Time2Vec import *
-
+import timm
 
 def init_layer(layer):
     nn.init.xavier_uniform_(layer.weight)
@@ -472,28 +472,66 @@ class ResNestSED(nn.Module):
 
 
 class EfficientNetSED(nn.Module):
-    def __init__(self, base_model_name: str, pretrained=False, num_classes=264):
+    def __init__(self, base_model_name: str, pretrained=False, num_classes=24, in_channels=1):
         super().__init__()
-        self.interpolate_ratio = 30  # Downsampled ratio
-        if pretrained:
-            self.base_model = EfficientNet.from_pretrained(base_model_name)
+        # Spectrogram extractor
+        self.n_fft = 2048 
+        self.hop_length = 512
+        self.fmax = 16000
+        self.fmin = 20
+        self.sample_rate = 32000
+        self.n_mels = 128
+        self.spectrogram_extractor = Spectrogram(n_fft=self.n_fft, hop_length=self.hop_length,
+                                                 win_length=self.n_fft, window="hann", center=True, pad_mode="reflect",
+                                                 freeze_parameters=True)
+
+        # Logmel feature extractor
+        self.logmel_extractor = LogmelFilterBank(sr=self.sample_rate, n_fft=self.n_fft,
+                                                 n_mels=self.n_mels, fmin=self.fmin, fmax=self.fmax, ref=1.0, amin=1e-10, top_db=None,
+                                                 freeze_parameters=True)
+
+        # Spec augmenter
+        self.spec_augmenter = SpecAugmentation(time_drop_width=64, time_stripes_num=2,
+                                               freq_drop_width=8, freq_stripes_num=2)
+
+        self.bn0 = nn.BatchNorm2d(self.n_mels)
+
+        base_model = timm.create_model(
+            "tf_efficientnet_b0_ns", pretrained=pretrained, in_chans=in_channels)
+        layers = list(base_model.children())[:-2]
+        self.encoder = nn.Sequential(*layers)
+
+        if hasattr(base_model, "fc"):
+            in_features = base_model.fc.in_features
         else:
-            self.base_model = EfficientNet.from_name(base_model_name)
-
-        in_features = self.base_model._fc.in_features
-
+            in_features = base_model.classifier.in_features
         self.fc1 = nn.Linear(in_features, in_features, bias=True)
-        self.att_block = AttBlockV2(in_features, num_classes, activation="sigmoid")
+        self.att_block = AttBlockV2(
+            in_features, num_classes, activation="sigmoid")
+
         self.init_weight()
 
     def init_weight(self):
         init_layer(self.fc1)
+        init_bn(self.bn0)
 
     def forward(self, input, meta):
-        frames_num = input.size(3)
+        # (batch_size, 1, time_steps, freq_bins)
+        x = self.spectrogram_extractor(input)
+        x = self.logmel_extractor(x)    # (batch_size, 1, time_steps, mel_bins)
 
+        frames_num = x.shape[2]
+
+        x = x.transpose(1, 3)
+        x = self.bn0(x)
+        x = x.transpose(1, 3)
+
+        if self.training:
+            x = self.spec_augmenter(x)
+
+        x = x.transpose(2, 3)
         # (batch_size, channels, freq, frames)
-        x = self.base_model.extract_features(input)
+        x = self.encoder(x)
 
         # (batch_size, channels, frames)
         x = torch.mean(x, dim=2)
@@ -513,11 +551,14 @@ class EfficientNetSED(nn.Module):
         segmentwise_logit = self.att_block.cla(x).transpose(1, 2)
         segmentwise_output = segmentwise_output.transpose(1, 2)
 
+        interpolate_ratio = frames_num // segmentwise_output.size(1)
+
         # Get framewise output
-        framewise_output = interpolate(segmentwise_output, self.interpolate_ratio)
+        framewise_output = interpolate(segmentwise_output,
+                                       interpolate_ratio)
         framewise_output = pad_framewise_output(framewise_output, frames_num)
 
-        framewise_logit = interpolate(segmentwise_logit, self.interpolate_ratio)
+        framewise_logit = interpolate(segmentwise_logit, interpolate_ratio)
         framewise_logit = pad_framewise_output(framewise_logit, frames_num)
 
         output_dict = {
@@ -525,7 +566,7 @@ class EfficientNetSED(nn.Module):
             "segmentwise_output": segmentwise_output,
             "logit": logit,
             "framewise_logit": framewise_logit,
-            "clipwise_output": clipwise_output,
+            "clipwise_output": clipwise_output
         }
 
         return output_dict
