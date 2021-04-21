@@ -97,6 +97,8 @@ def load_config(path: str):
     with open(path) as f:
         config = yaml.safe_load(f)
     return config
+
+
 def map_score(targ, out):
     targ = targ["clipwise_output"].detach().cpu().numpy()
     clipwise_output = out.detach().cpu().numpy()

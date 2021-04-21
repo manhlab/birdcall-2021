@@ -87,7 +87,7 @@ def get_loader(
         loader_config = config["loader"][phase]
 
         dataset = datasets.PANNsDataset(df, datadir=datadir, transforms=transforms)
-    
+
     elif dataset_config["name"] == "WaveformDatasetKkiller":
         waveform_transforms = get_waveform_transforms(config, phase)
         spectrogram_transforms = get_spectrogram_transforms(config, phase)

@@ -1,17 +1,19 @@
-'''
+"""
 ISC License
 Copyright (c) 2013--2017, librosa development team.
 
 Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby granted, provided that the above copyright notice and this permission notice appear in all copies.
 
 THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-'''
+"""
 
 import torch.nn as nn
 import numpy as np
 import torch
 import librosa
 import torch.nn.functional as F
+
+
 class DFTBase(nn.Module):
     def __init__(self):
         """Base class for DFT and IDFT matrix"""
@@ -28,17 +30,25 @@ class DFTBase(nn.Module):
         omega = np.exp(2 * np.pi * 1j / n)
         W = np.power(omega, x * y)
         return W
-    
-    
+
+
 class STFT(DFTBase):
-    def __init__(self, n_fft=2048, hop_length=None, win_length=None, 
-        window='hann', center=True, pad_mode='reflect', freeze_parameters=True):
-        """Implementation of STFT with Conv1d. The function has the same output 
+    def __init__(
+        self,
+        n_fft=2048,
+        hop_length=None,
+        win_length=None,
+        window="hann",
+        center=True,
+        pad_mode="reflect",
+        freeze_parameters=True,
+    ):
+        """Implementation of STFT with Conv1d. The function has the same output
         of librosa.core.stft
         """
         super(STFT, self).__init__()
 
-        assert pad_mode in ['constant', 'reflect']
+        assert pad_mode in ["constant", "reflect"]
 
         self.n_fft = n_fft
         self.center = center
@@ -62,20 +72,36 @@ class STFT(DFTBase):
 
         out_channels = n_fft // 2 + 1
 
-        self.conv_real = nn.Conv1d(in_channels=1, out_channels=out_channels, 
-            kernel_size=n_fft, stride=hop_length, padding=0, dilation=1, 
-            groups=1, bias=False)
+        self.conv_real = nn.Conv1d(
+            in_channels=1,
+            out_channels=out_channels,
+            kernel_size=n_fft,
+            stride=hop_length,
+            padding=0,
+            dilation=1,
+            groups=1,
+            bias=False,
+        )
 
-        self.conv_imag = nn.Conv1d(in_channels=1, out_channels=out_channels, 
-            kernel_size=n_fft, stride=hop_length, padding=0, dilation=1, 
-            groups=1, bias=False)
+        self.conv_imag = nn.Conv1d(
+            in_channels=1,
+            out_channels=out_channels,
+            kernel_size=n_fft,
+            stride=hop_length,
+            padding=0,
+            dilation=1,
+            groups=1,
+            bias=False,
+        )
 
         self.conv_real.weight.data = torch.Tensor(
-            np.real(self.W[:, 0 : out_channels] * fft_window[:, None]).T)[:, None, :]
+            np.real(self.W[:, 0:out_channels] * fft_window[:, None]).T
+        )[:, None, :]
         # (n_fft // 2 + 1, 1, n_fft)
 
         self.conv_imag.weight.data = torch.Tensor(
-            np.imag(self.W[:, 0 : out_channels] * fft_window[:, None]).T)[:, None, :]
+            np.imag(self.W[:, 0:out_channels] * fft_window[:, None]).T
+        )[:, None, :]
         # (n_fft // 2 + 1, 1, n_fft)
 
         if freeze_parameters:
@@ -89,7 +115,7 @@ class STFT(DFTBase):
           imag: (batch_size, n_fft // 2 + 1, time_steps)
         """
 
-        x = input[:, None, :]   # (batch_size, channels_num, data_length)
+        x = input[:, None, :]  # (batch_size, channels_num, data_length)
 
         if self.center:
             x = F.pad(x, pad=(self.n_fft // 2, self.n_fft // 2), mode=self.pad_mode)
@@ -103,22 +129,36 @@ class STFT(DFTBase):
         # (batch_size, 1, time_steps, n_fft // 2 + 1)
 
         return real, imag
-    
-    
+
+
 class Spectrogram(nn.Module):
-    def __init__(self, n_fft=2048, hop_length=None, win_length=None, 
-        window='hann', center=True, pad_mode='reflect', power=2.0, 
-        freeze_parameters=True):
-        """Calculate spectrogram using pytorch. The STFT is implemented with 
+    def __init__(
+        self,
+        n_fft=2048,
+        hop_length=None,
+        win_length=None,
+        window="hann",
+        center=True,
+        pad_mode="reflect",
+        power=2.0,
+        freeze_parameters=True,
+    ):
+        """Calculate spectrogram using pytorch. The STFT is implemented with
         Conv1d. The function has the same output of librosa.core.stft
         """
         super(Spectrogram, self).__init__()
 
         self.power = power
 
-        self.stft = STFT(n_fft=n_fft, hop_length=hop_length, 
-            win_length=win_length, window=window, center=center, 
-            pad_mode=pad_mode, freeze_parameters=True)
+        self.stft = STFT(
+            n_fft=n_fft,
+            hop_length=hop_length,
+            win_length=win_length,
+            window=window,
+            center=center,
+            pad_mode=pad_mode,
+            freeze_parameters=True,
+        )
 
     def forward(self, input):
         """input: (batch_size, 1, time_steps, n_fft // 2 + 1)
@@ -138,12 +178,23 @@ class Spectrogram(nn.Module):
 
         return spectrogram
 
-    
+
 class LogmelFilterBank(nn.Module):
-    def __init__(self, sr=32000, n_fft=2048, n_mels=64, fmin=50, fmax=14000, is_log=True, 
-        ref=1.0, amin=1e-10, top_db=80.0, freeze_parameters=True):
-        """Calculate logmel spectrogram using pytorch. The mel filter bank is 
-        the pytorch implementation of as librosa.filters.mel 
+    def __init__(
+        self,
+        sr=32000,
+        n_fft=2048,
+        n_mels=64,
+        fmin=50,
+        fmax=14000,
+        is_log=True,
+        ref=1.0,
+        amin=1e-10,
+        top_db=80.0,
+        freeze_parameters=True,
+    ):
+        """Calculate logmel spectrogram using pytorch. The mel filter bank is
+        the pytorch implementation of as librosa.filters.mel
         """
         super(LogmelFilterBank, self).__init__()
 
@@ -152,8 +203,9 @@ class LogmelFilterBank(nn.Module):
         self.amin = amin
         self.top_db = top_db
 
-        self.melW = librosa.filters.mel(sr=sr, n_fft=n_fft, n_mels=n_mels,
-            fmin=fmin, fmax=fmax).T
+        self.melW = librosa.filters.mel(
+            sr=sr, n_fft=n_fft, n_mels=n_mels, fmin=fmin, fmax=fmax
+        ).T
         # (n_fft // 2 + 1, mel_bins)
 
         self.melW = nn.Parameter(torch.Tensor(self.melW))
@@ -164,7 +216,7 @@ class LogmelFilterBank(nn.Module):
 
     def forward(self, input):
         """input: (batch_size, channels, time_steps)
-        
+
         Output: (batch_size, time_steps, mel_bins)
         """
 
@@ -179,9 +231,8 @@ class LogmelFilterBank(nn.Module):
 
         return output
 
-
     def power_to_db(self, input):
-        """Power to db, this function is the pytorch implementation of 
+        """Power to db, this function is the pytorch implementation of
         librosa.core.power_to_lb
         """
         ref_value = self.ref
@@ -190,15 +241,17 @@ class LogmelFilterBank(nn.Module):
 
         if self.top_db is not None:
             if self.top_db < 0:
-                raise ParameterError('top_db must be non-negative')
-            log_spec = torch.clamp(log_spec, min=log_spec.max().item() - self.top_db, max=np.inf)
+                raise ParameterError("top_db must be non-negative")
+            log_spec = torch.clamp(
+                log_spec, min=log_spec.max().item() - self.top_db, max=np.inf
+            )
 
         return log_spec
 
 
 class DropStripes(nn.Module):
     def __init__(self, dim, drop_width, stripes_num):
-        """Drop stripes. 
+        """Drop stripes.
         Args:
           dim: int, dimension along which to drop
           drop_width: int, maximum width of stripes to drop
@@ -206,7 +259,7 @@ class DropStripes(nn.Module):
         """
         super(DropStripes, self).__init__()
 
-        assert dim in [2, 3]    # dim 2: time; dim 3: frequency
+        assert dim in [2, 3]  # dim 2: time; dim 3: frequency
 
         self.dim = dim
         self.drop_width = drop_width
@@ -229,7 +282,6 @@ class DropStripes(nn.Module):
 
             return input
 
-
     def transform_slice(self, e, total_width):
         """e: (channels, time_steps, freq_bins)"""
 
@@ -244,11 +296,12 @@ class DropStripes(nn.Module):
 
 
 class SpecAugmentation(nn.Module):
-    def __init__(self, time_drop_width, time_stripes_num, freq_drop_width, 
-        freq_stripes_num):
-        """Spec augmetation. 
-        [ref] Park, D.S., Chan, W., Zhang, Y., Chiu, C.C., Zoph, B., Cubuk, E.D. 
-        and Le, Q.V., 2019. Specaugment: A simple data augmentation method 
+    def __init__(
+        self, time_drop_width, time_stripes_num, freq_drop_width, freq_stripes_num
+    ):
+        """Spec augmetation.
+        [ref] Park, D.S., Chan, W., Zhang, Y., Chiu, C.C., Zoph, B., Cubuk, E.D.
+        and Le, Q.V., 2019. Specaugment: A simple data augmentation method
         for automatic speech recognition. arXiv preprint arXiv:1904.08779.
         Args:
           time_drop_width: int
@@ -259,11 +312,13 @@ class SpecAugmentation(nn.Module):
 
         super(SpecAugmentation, self).__init__()
 
-        self.time_dropper = DropStripes(dim=2, drop_width=time_drop_width, 
-            stripes_num=time_stripes_num)
+        self.time_dropper = DropStripes(
+            dim=2, drop_width=time_drop_width, stripes_num=time_stripes_num
+        )
 
-        self.freq_dropper = DropStripes(dim=3, drop_width=freq_drop_width, 
-            stripes_num=freq_stripes_num)
+        self.freq_dropper = DropStripes(
+            dim=3, drop_width=freq_drop_width, stripes_num=freq_stripes_num
+        )
 
     def forward(self, input):
         x = self.time_dropper(input)

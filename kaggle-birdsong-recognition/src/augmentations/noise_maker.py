@@ -1,4 +1,4 @@
-''' source: https://github.com/felixpatzelt/colorednoise
+""" source: https://github.com/felixpatzelt/colorednoise
 MIT License
 
 Copyright (c) 2014-2017 Felix Patzelt
@@ -20,7 +20,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
-'''
+"""
 
 """Generate colored noise."""
 
@@ -65,56 +65,57 @@ def powerlaw_psd_gaussian(exponent, size, fmin=0):
     >>> import colorednoise as cn
     >>> y = cn.powerlaw_psd_gaussian(1, 5)
     """
-    
+
     # Make sure size is a list so we can iterate it and assign to it.
     try:
         size = list(size)
     except TypeError:
         size = [size]
-    
+
     # The number of samples in each time series
     samples = size[-1]
-    
+
     # Calculate Frequencies (we asume a sample rate of one)
     # Use fft functions for real output (-> hermitian spectrum)
     f = rfftfreq(samples)
-    
+
     # Build scaling factors for all frequencies
     s_scale = f
-    fmin = max(fmin, 1./samples) # Low frequency cutoff
-    ix   = npsum(s_scale < fmin)   # Index of the cutoff
+    fmin = max(fmin, 1.0 / samples)  # Low frequency cutoff
+    ix = npsum(s_scale < fmin)  # Index of the cutoff
     if ix and ix < len(s_scale):
         s_scale[:ix] = s_scale[ix]
-    s_scale = s_scale**(-exponent/2.)
-    
+    s_scale = s_scale ** (-exponent / 2.0)
+
     # Calculate theoretical output standard deviation from scaling
-    w      = s_scale[1:].copy()
-    w[-1] *= (1 + (samples % 2)) / 2. # correct f = +-0.5
-    sigma = 2 * sqrt(npsum(w**2)) / samples
-    
+    w = s_scale[1:].copy()
+    w[-1] *= (1 + (samples % 2)) / 2.0  # correct f = +-0.5
+    sigma = 2 * sqrt(npsum(w ** 2)) / samples
+
     # Adjust size to generate one Fourier component per frequency
     size[-1] = len(f)
 
     # Add empty dimension(s) to broadcast s_scale along last
     # dimension of generated random power + phase (below)
     dims_to_add = len(size) - 1
-    s_scale     = s_scale[(newaxis,) * dims_to_add + (Ellipsis,)]
-    
+    s_scale = s_scale[(newaxis,) * dims_to_add + (Ellipsis,)]
+
     # Generate scaled random power + phase
     sr = normal(scale=s_scale, size=size)
     si = normal(scale=s_scale, size=size)
-    
+
     # If the signal length is even, frequencies +/- 0.5 are equal
     # so the coefficient must be real.
-    if not (samples % 2): si[...,-1] = 0
-    
+    if not (samples % 2):
+        si[..., -1] = 0
+
     # Regardless of signal length, the DC component must be real
-    si[...,0] = 0
-    
+    si[..., 0] = 0
+
     # Combine power + corrected phase to Fourier components
-    s  = sr + 1J * si
-    
+    s = sr + 1j * si
+
     # Transform to real time series & scale to unit variance
     y = irfft(s, n=samples, axis=-1) / sigma
-    
+
     return y

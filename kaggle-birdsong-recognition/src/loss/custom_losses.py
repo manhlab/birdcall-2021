@@ -1,9 +1,9 @@
-  
 import torch
 from torch import nn
 import torch.nn.functional as F
 
 EPSILON_FP16 = 1e-5
+
 
 class LqLoss(nn.Module):
     def __init__(self, q=0.5):
@@ -15,6 +15,7 @@ class LqLoss(nn.Module):
         loss = (1 - (loss + EPSILON_FP16) ** self.q) / self.q
         return loss.mean()
 
+
 class LSoftLoss(nn.Module):
     def __init__(self, beta=0.5):
         super().__init__()
@@ -23,8 +24,9 @@ class LSoftLoss(nn.Module):
     def forward(self, y_pred, y_true):
         with torch.no_grad():
             y_true_update = self.beta * y_true + (1 - self.beta) * y_pred
-        
+
         return F.binary_cross_entropy(y_pred, y_true_update)
+
 
 class CuratedLoss(nn.Module):
     def __init__(self):
@@ -38,9 +40,9 @@ class CuratedLoss(nn.Module):
 class NoisyCuratedLoss(nn.Module):
     def __init__(self, noisy_type, beta=0.7, q=0.7):
         super().__init__()
-        if noisy_type=="lsoft":
+        if noisy_type == "lsoft":
             self.noisy_loss = LSoftLoss(beta=beta)
-        elif noisy_type=="lq":
+        elif noisy_type == "lq":
             self.noisy_loss = LqLoss(q=q)
         self.curated_loss = CuratedLoss()
         self.sigmoid = nn.Sigmoid()
@@ -50,10 +52,10 @@ class NoisyCuratedLoss(nn.Module):
         clean = clean.reshape(-1)
         bs, s, o = target.shape
         output = self.sigmoid(output)
-        output = torch.clamp(output, min=EPSILON_FP16, max=1.0-EPSILON_FP16)
+        output = torch.clamp(output, min=EPSILON_FP16, max=1.0 - EPSILON_FP16)
 
-        output = output.reshape(bs*s,o)
-        target = target.reshape(bs*s,o)
+        output = output.reshape(bs * s, o)
+        target = target.reshape(bs * s, o)
 
         noisy_indexes = (clean == 0).nonzero().squeeze(1)
         curated_indexes = clean.nonzero().squeeze(1)

@@ -86,7 +86,7 @@ if __name__ == "__main__":
 
     df, datadir = C.get_metadata(config)
     splitter = C.get_split(config)
-    
+
     if config["data"].get("event_level_labels") is not None:
         event_level_labels = C.get_event_level_labels(config)
     else:
@@ -97,9 +97,11 @@ if __name__ == "__main__":
             continue
         checkpoint = ModelCheckpoint(global_params["output_dir"] + f"/fold-{i}")
         early_stop_callback = EarlyStopping(
-        monitor="val_map", min_delta=0.00, patience=10, verbose=False, mode="max"
+            monitor="val_map", min_delta=0.00, patience=10, verbose=False, mode="max"
         )
-        logger = TensorBoardLogger(save_dir=os.getcwd(), version=1, name="lightning_logs")
+        logger = TensorBoardLogger(
+            save_dir=os.getcwd(), version=1, name="lightning_logs"
+        )
 
         lightning_model = LightningBirdcall(config, trn_idx, val_idx)
         trainer = pl.Trainer(

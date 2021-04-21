@@ -1,4 +1,4 @@
-'''
+"""
 The MIT License
   
 Copyright (c) 2018-2020 Qiuqiang Kong
@@ -20,7 +20,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
-'''
+"""
 
 
 import torch
@@ -30,16 +30,17 @@ import torchvision.models as models
 
 from augmentations.mixup import do_mixup
 
+
 def init_layer(layer):
     nn.init.xavier_uniform_(layer.weight)
 
     if hasattr(layer, "bias"):
         if layer.bias is not None:
-            layer.bias.data.fill_(0.)
+            layer.bias.data.fill_(0.0)
 
 
 def init_bn(bn):
-    bn.bias.data.fill_(0.)
+    bn.bias.data.fill_(0.0)
     bn.weight.data.fill_(1.0)
 
 
@@ -69,7 +70,8 @@ def pad_framewise_output(framewise_output: torch.Tensor, frames_num: int):
       output: (batch_size, frames_num, classes_num)
     """
     pad = framewise_output[:, -1:, :].repeat(
-        1, frames_num - framewise_output.shape[1], 1)
+        1, frames_num - framewise_output.shape[1], 1
+    )
     """tensor for padding"""
 
     output = torch.cat((framewise_output, pad), dim=1)
@@ -88,7 +90,8 @@ class ConvBlock(nn.Module):
             kernel_size=(3, 3),
             stride=(1, 1),
             padding=(1, 1),
-            bias=False)
+            bias=False,
+        )
 
         self.conv2 = nn.Conv2d(
             in_channels=out_channels,
@@ -96,7 +99,8 @@ class ConvBlock(nn.Module):
             kernel_size=(3, 3),
             stride=(1, 1),
             padding=(1, 1),
-            bias=False)
+            bias=False,
+        )
 
         self.bn1 = nn.BatchNorm2d(out_channels)
         self.bn2 = nn.BatchNorm2d(out_channels)
@@ -109,31 +113,29 @@ class ConvBlock(nn.Module):
         init_bn(self.bn1)
         init_bn(self.bn2)
 
-    def forward(self, input, pool_size=(2, 2), pool_type='avg'):
+    def forward(self, input, pool_size=(2, 2), pool_type="avg"):
 
         x = input
         x = F.relu_(self.bn1(self.conv1(x)))
         x = F.relu_(self.bn2(self.conv2(x)))
-        if pool_type == 'max':
+        if pool_type == "max":
             x = F.max_pool2d(x, kernel_size=pool_size)
-        elif pool_type == 'avg':
+        elif pool_type == "avg":
             x = F.avg_pool2d(x, kernel_size=pool_size)
-        elif pool_type == 'avg+max':
+        elif pool_type == "avg+max":
             x1 = F.avg_pool2d(x, kernel_size=pool_size)
             x2 = F.max_pool2d(x, kernel_size=pool_size)
             x = x1 + x2
         else:
-            raise Exception('Incorrect argument!')
+            raise Exception("Incorrect argument!")
 
         return x
 
 
 class AttBlock(nn.Module):
-    def __init__(self,
-                 in_features: int,
-                 out_features: int,
-                 activation="linear",
-                 temperature=1.0):
+    def __init__(
+        self, in_features: int, out_features: int, activation="linear", temperature=1.0
+    ):
         super().__init__()
 
         self.activation = activation
@@ -144,14 +146,16 @@ class AttBlock(nn.Module):
             kernel_size=1,
             stride=1,
             padding=0,
-            bias=True)
+            bias=True,
+        )
         self.cla = nn.Conv1d(
             in_channels=in_features,
             out_channels=out_features,
             kernel_size=1,
             stride=1,
             padding=0,
-            bias=True)
+            bias=True,
+        )
 
         self.bn_att = nn.BatchNorm1d(out_features)
         self.init_weights()
@@ -169,22 +173,32 @@ class AttBlock(nn.Module):
         return x, norm_att, cla
 
     def nonlinear_transform(self, x):
-        if self.activation == 'linear':
+        if self.activation == "linear":
             return x
-        elif self.activation == 'sigmoid':
+        elif self.activation == "sigmoid":
             return torch.sigmoid(x)
+
 
 from helpers.sed_audio_utils import *
 
 
 class PANNsCNN14Att(nn.Module):
-    def __init__(self, sample_rate: int, window_size: int, hop_size: int,
-                 mel_bins: int, fmin: int, fmax: int, classes_num: int, apply_aug: bool):
+    def __init__(
+        self,
+        sample_rate: int,
+        window_size: int,
+        hop_size: int,
+        mel_bins: int,
+        fmin: int,
+        fmax: int,
+        classes_num: int,
+        apply_aug: bool,
+    ):
         super().__init__()
-        
-        window = 'hann'
+
+        window = "hann"
         center = True
-        pad_mode = 'reflect'
+        pad_mode = "reflect"
         ref = 1.0
         amin = 1e-10
         top_db = None
@@ -199,7 +213,8 @@ class PANNsCNN14Att(nn.Module):
             window=window,
             center=center,
             pad_mode=pad_mode,
-            freeze_parameters=True)
+            freeze_parameters=True,
+        )
 
         # Logmel feature extractor
         self.logmel_extractor = LogmelFilterBank(
@@ -211,14 +226,16 @@ class PANNsCNN14Att(nn.Module):
             ref=ref,
             amin=amin,
             top_db=top_db,
-            freeze_parameters=True)
+            freeze_parameters=True,
+        )
 
         # Spec augmenter
         self.spec_augmenter = SpecAugmentation(
             time_drop_width=64,
             time_stripes_num=2,
             freq_drop_width=8,
-            freq_stripes_num=2)
+            freq_stripes_num=2,
+        )
 
         self.bn0 = nn.BatchNorm2d(mel_bins)
 
@@ -230,32 +247,34 @@ class PANNsCNN14Att(nn.Module):
         # self.conv_block6 = ConvBlock(in_channels=1024, out_channels=2048)
 
         self.fc1 = nn.Linear(1024, 1024, bias=True)
-        self.att_block = AttBlock(1024, classes_num, activation='sigmoid')
+        self.att_block = AttBlock(1024, classes_num, activation="sigmoid")
 
         self.init_weight()
 
     def init_weight(self):
         init_bn(self.bn0)
         init_layer(self.fc1)
-        
+
     def cnn_feature_extractor(self, x):
-        x = self.conv_block1(x, pool_size=(2, 2), pool_type='avg')
+        x = self.conv_block1(x, pool_size=(2, 2), pool_type="avg")
         x = F.dropout(x, p=0.2, training=self.training)
-        x = self.conv_block2(x, pool_size=(2, 2), pool_type='avg')
+        x = self.conv_block2(x, pool_size=(2, 2), pool_type="avg")
         x = F.dropout(x, p=0.2, training=self.training)
-        x = self.conv_block3(x, pool_size=(2, 2), pool_type='avg')
+        x = self.conv_block3(x, pool_size=(2, 2), pool_type="avg")
         x = F.dropout(x, p=0.2, training=self.training)
-        x = self.conv_block4(x, pool_size=(2, 2), pool_type='avg')
+        x = self.conv_block4(x, pool_size=(2, 2), pool_type="avg")
         x = F.dropout(x, p=0.2, training=self.training)
-        x = self.conv_block5(x, pool_size=(2, 2), pool_type='avg')
+        x = self.conv_block5(x, pool_size=(2, 2), pool_type="avg")
         x = F.dropout(x, p=0.2, training=self.training)
         # x = self.conv_block6(x, pool_size=(1, 1), pool_type='avg')
         # x = F.dropout(x, p=0.2, training=self.training)
         return x
-    
+
     def preprocess(self, input_x, mixup_lambda=None):
 
-        x = self.spectrogram_extractor(input_x)  # (batch_size, 1, time_steps, freq_bins)
+        x = self.spectrogram_extractor(
+            input_x
+        )  # (batch_size, 1, time_steps, freq_bins)
         x = self.logmel_extractor(x)  # (batch_size, 1, time_steps, mel_bins)
 
         frames_num = x.shape[2]
@@ -268,24 +287,23 @@ class PANNsCNN14Att(nn.Module):
             x = self.spec_augmenter(x)
 
         # Mixup on spectrogram
-        if self.training  and self.apply_aug and mixup_lambda is not None:
+        if self.training and self.apply_aug and mixup_lambda is not None:
             x = do_mixup(x, mixup_lambda)
         return x, frames_num
-        
 
     def forward(self, input_data):
         input_x, mixup_lambda = input_data
         """
         Input: (batch_size, data_length)"""
         b, c, s = input_x.shape
-        input_x = input_x.reshape(b*c, s)
+        input_x = input_x.reshape(b * c, s)
         x, frames_num = self.preprocess(input_x, mixup_lambda=mixup_lambda)
         if mixup_lambda is not None:
-            b = (b*c)//2
+            b = (b * c) // 2
             c = 1
         # Output shape (batch size, channels, time, frequency)
         x = self.cnn_feature_extractor(x)
-        
+
         # Aggregate in frequency axis
         x = torch.mean(x, dim=3)
 
@@ -303,27 +321,38 @@ class PANNsCNN14Att(nn.Module):
         segmentwise_output = segmentwise_output.transpose(1, 2)
 
         # Get framewise output
-        framewise_output = interpolate(segmentwise_output,
-                                       self.interpolate_ratio)
+        framewise_output = interpolate(segmentwise_output, self.interpolate_ratio)
         framewise_output = pad_framewise_output(framewise_output, frames_num)
-        frame_shape =  framewise_output.shape
+        frame_shape = framewise_output.shape
         clip_shape = clipwise_output.shape
         output_dict = {
-            'framewise_output': framewise_output.reshape(b, c, frame_shape[1],frame_shape[2]),
-            'clipwise_output': clipwise_output.reshape(b, c, clip_shape[1]),
+            "framewise_output": framewise_output.reshape(
+                b, c, frame_shape[1], frame_shape[2]
+            ),
+            "clipwise_output": clipwise_output.reshape(b, c, clip_shape[1]),
         }
 
         return output_dict
 
 
 class PANNsDense121Att(nn.Module):
-    def __init__(self, sample_rate: int, window_size: int, hop_size: int,
-                 mel_bins: int, fmin: int, fmax: int, classes_num: int, apply_aug: bool, top_db=None):
+    def __init__(
+        self,
+        sample_rate: int,
+        window_size: int,
+        hop_size: int,
+        mel_bins: int,
+        fmin: int,
+        fmax: int,
+        classes_num: int,
+        apply_aug: bool,
+        top_db=None,
+    ):
         super().__init__()
-        
-        window = 'hann'
+
+        window = "hann"
         center = True
-        pad_mode = 'reflect'
+        pad_mode = "reflect"
         ref = 1.0
         amin = 1e-10
         self.interpolate_ratio = 32  # Downsampled ratio
@@ -337,7 +366,8 @@ class PANNsDense121Att(nn.Module):
             window=window,
             center=center,
             pad_mode=pad_mode,
-            freeze_parameters=True)
+            freeze_parameters=True,
+        )
 
         # Logmel feature extractor
         self.logmel_extractor = LogmelFilterBank(
@@ -349,20 +379,21 @@ class PANNsDense121Att(nn.Module):
             ref=ref,
             amin=amin,
             top_db=top_db,
-            freeze_parameters=True)
+            freeze_parameters=True,
+        )
 
         # Spec augmenter
         self.spec_augmenter = SpecAugmentation(
             time_drop_width=64,
             time_stripes_num=2,
             freq_drop_width=8,
-            freq_stripes_num=2)
+            freq_stripes_num=2,
+        )
 
         self.bn0 = nn.BatchNorm2d(mel_bins)
 
         self.fc1 = nn.Linear(1024, 1024, bias=True)
-        self.att_block = AttBlock(1024, classes_num, activation='sigmoid')
-
+        self.att_block = AttBlock(1024, classes_num, activation="sigmoid")
 
         self.densenet_features = models.densenet121(pretrained=True).features
 
@@ -371,14 +402,16 @@ class PANNsDense121Att(nn.Module):
     def init_weight(self):
         init_bn(self.bn0)
         init_layer(self.fc1)
-        
+
     def cnn_feature_extractor(self, x):
         x = self.densenet_features(x)
         return x
-    
+
     def preprocess(self, input_x, mixup_lambda=None):
 
-        x = self.spectrogram_extractor(input_x)  # (batch_size, 1, time_steps, freq_bins)
+        x = self.spectrogram_extractor(
+            input_x
+        )  # (batch_size, 1, time_steps, freq_bins)
         x = self.logmel_extractor(x)  # (batch_size, 1, time_steps, mel_bins)
 
         frames_num = x.shape[2]
@@ -391,25 +424,24 @@ class PANNsDense121Att(nn.Module):
             x = self.spec_augmenter(x)
 
         # Mixup on spectrogram
-        if self.training  and self.apply_aug and mixup_lambda is not None:
+        if self.training and self.apply_aug and mixup_lambda is not None:
             x = do_mixup(x, mixup_lambda)
         return x, frames_num
-        
 
     def forward(self, input_data):
         input_x, mixup_lambda = input_data
         """
         Input: (batch_size, data_length)"""
         b, c, s = input_x.shape
-        input_x = input_x.reshape(b*c, s)
+        input_x = input_x.reshape(b * c, s)
         x, frames_num = self.preprocess(input_x, mixup_lambda=mixup_lambda)
         if mixup_lambda is not None:
-            b = (b*c)//2
+            b = (b * c) // 2
             c = 1
         # Output shape (batch size, channels, time, frequency)
         x = x.expand(x.shape[0], 3, x.shape[2], x.shape[3])
         x = self.cnn_feature_extractor(x)
-        
+
         # Aggregate in frequency axis
         x = torch.mean(x, dim=3)
 
@@ -427,27 +459,38 @@ class PANNsDense121Att(nn.Module):
         segmentwise_output = segmentwise_output.transpose(1, 2)
 
         # Get framewise output
-        framewise_output = interpolate(segmentwise_output,
-                                       self.interpolate_ratio)
+        framewise_output = interpolate(segmentwise_output, self.interpolate_ratio)
         framewise_output = pad_framewise_output(framewise_output, frames_num)
-        frame_shape =  framewise_output.shape
+        frame_shape = framewise_output.shape
         clip_shape = clipwise_output.shape
         output_dict = {
-            'framewise_output': framewise_output.reshape(b, c, frame_shape[1],frame_shape[2]),
-            'clipwise_output': clipwise_output.reshape(b, c, clip_shape[1]),
+            "framewise_output": framewise_output.reshape(
+                b, c, frame_shape[1], frame_shape[2]
+            ),
+            "clipwise_output": clipwise_output.reshape(b, c, clip_shape[1]),
         }
 
         return output_dict
 
 
 class PANNsDense161Att(nn.Module):
-    def __init__(self, sample_rate: int, window_size: int, hop_size: int,
-                 mel_bins: int, fmin: int, fmax: int, classes_num: int, apply_aug: bool, top_db=None):
+    def __init__(
+        self,
+        sample_rate: int,
+        window_size: int,
+        hop_size: int,
+        mel_bins: int,
+        fmin: int,
+        fmax: int,
+        classes_num: int,
+        apply_aug: bool,
+        top_db=None,
+    ):
         super().__init__()
-        
-        window = 'hann'
+
+        window = "hann"
         center = True
-        pad_mode = 'reflect'
+        pad_mode = "reflect"
         ref = 1.0
         amin = 1e-10
         self.interpolate_ratio = 32  # Downsampled ratio
@@ -461,7 +504,8 @@ class PANNsDense161Att(nn.Module):
             window=window,
             center=center,
             pad_mode=pad_mode,
-            freeze_parameters=True)
+            freeze_parameters=True,
+        )
 
         # Logmel feature extractor
         self.logmel_extractor = LogmelFilterBank(
@@ -473,19 +517,21 @@ class PANNsDense161Att(nn.Module):
             ref=ref,
             amin=amin,
             top_db=top_db,
-            freeze_parameters=True)
+            freeze_parameters=True,
+        )
 
         # Spec augmenter
         self.spec_augmenter = SpecAugmentation(
             time_drop_width=64,
             time_stripes_num=2,
             freq_drop_width=8,
-            freq_stripes_num=2)
+            freq_stripes_num=2,
+        )
 
         self.bn0 = nn.BatchNorm2d(mel_bins)
 
         self.fc1 = nn.Linear(2208, 2048, bias=True)
-        self.att_block = AttBlock(2048, classes_num, activation='sigmoid')
+        self.att_block = AttBlock(2048, classes_num, activation="sigmoid")
 
         self.init_weight()
 
@@ -494,14 +540,16 @@ class PANNsDense161Att(nn.Module):
     def init_weight(self):
         init_bn(self.bn0)
         init_layer(self.fc1)
-        
+
     def cnn_feature_extractor(self, x):
         x = self.densenet_features(x)
         return x
-    
+
     def preprocess(self, input_x, mixup_lambda=None):
 
-        x = self.spectrogram_extractor(input_x)  # (batch_size, 1, time_steps, freq_bins)
+        x = self.spectrogram_extractor(
+            input_x
+        )  # (batch_size, 1, time_steps, freq_bins)
         x = self.logmel_extractor(x)  # (batch_size, 1, time_steps, mel_bins)
 
         frames_num = x.shape[2]
@@ -514,25 +562,24 @@ class PANNsDense161Att(nn.Module):
             x = self.spec_augmenter(x)
 
         # Mixup on spectrogram
-        if self.training  and self.apply_aug and mixup_lambda is not None:
+        if self.training and self.apply_aug and mixup_lambda is not None:
             x = do_mixup(x, mixup_lambda)
         return x, frames_num
-        
 
     def forward(self, input_data):
         input_x, mixup_lambda = input_data
         """
         Input: (batch_size, data_length)"""
         b, c, s = input_x.shape
-        input_x = input_x.reshape(b*c, s)
+        input_x = input_x.reshape(b * c, s)
         x, frames_num = self.preprocess(input_x, mixup_lambda=mixup_lambda)
         if mixup_lambda is not None:
-            b = (b*c)//2
+            b = (b * c) // 2
             c = 1
         # Output shape (batch size, channels, time, frequency)
         x = x.expand(x.shape[0], 3, x.shape[2], x.shape[3])
         x = self.cnn_feature_extractor(x)
-        
+
         # Aggregate in frequency axis
         x = torch.mean(x, dim=3)
 
@@ -550,27 +597,38 @@ class PANNsDense161Att(nn.Module):
         segmentwise_output = segmentwise_output.transpose(1, 2)
 
         # Get framewise output
-        framewise_output = interpolate(segmentwise_output,
-                                       self.interpolate_ratio)
+        framewise_output = interpolate(segmentwise_output, self.interpolate_ratio)
         framewise_output = pad_framewise_output(framewise_output, frames_num)
-        frame_shape =  framewise_output.shape
+        frame_shape = framewise_output.shape
         clip_shape = clipwise_output.shape
         output_dict = {
-            'framewise_output': framewise_output.reshape(b, c, frame_shape[1],frame_shape[2]),
-            'clipwise_output': clipwise_output.reshape(b, c, clip_shape[1]),
+            "framewise_output": framewise_output.reshape(
+                b, c, frame_shape[1], frame_shape[2]
+            ),
+            "clipwise_output": clipwise_output.reshape(b, c, clip_shape[1]),
         }
 
         return output_dict
 
 
 class PANNsDense169Att(nn.Module):
-    def __init__(self, sample_rate: int, window_size: int, hop_size: int,
-                 mel_bins: int, fmin: int, fmax: int, classes_num: int, apply_aug: bool, top_db=None):
+    def __init__(
+        self,
+        sample_rate: int,
+        window_size: int,
+        hop_size: int,
+        mel_bins: int,
+        fmin: int,
+        fmax: int,
+        classes_num: int,
+        apply_aug: bool,
+        top_db=None,
+    ):
         super().__init__()
-        
-        window = 'hann'
+
+        window = "hann"
         center = True
-        pad_mode = 'reflect'
+        pad_mode = "reflect"
         ref = 1.0
         amin = 1e-10
         self.interpolate_ratio = 32  # Downsampled ratio
@@ -584,7 +642,8 @@ class PANNsDense169Att(nn.Module):
             window=window,
             center=center,
             pad_mode=pad_mode,
-            freeze_parameters=True)
+            freeze_parameters=True,
+        )
 
         # Logmel feature extractor
         self.logmel_extractor = LogmelFilterBank(
@@ -596,19 +655,21 @@ class PANNsDense169Att(nn.Module):
             ref=ref,
             amin=amin,
             top_db=top_db,
-            freeze_parameters=True)
+            freeze_parameters=True,
+        )
 
         # Spec augmenter
         self.spec_augmenter = SpecAugmentation(
             time_drop_width=64,
             time_stripes_num=2,
             freq_drop_width=8,
-            freq_stripes_num=2)
+            freq_stripes_num=2,
+        )
 
         self.bn0 = nn.BatchNorm2d(mel_bins)
 
         self.fc1 = nn.Linear(1664, 1024, bias=True)
-        self.att_block = AttBlock(1024, classes_num, activation='sigmoid')
+        self.att_block = AttBlock(1024, classes_num, activation="sigmoid")
 
         self.init_weight()
 
@@ -617,14 +678,16 @@ class PANNsDense169Att(nn.Module):
     def init_weight(self):
         init_bn(self.bn0)
         init_layer(self.fc1)
-        
+
     def cnn_feature_extractor(self, x):
         x = self.densenet_features(x)
         return x
-    
+
     def preprocess(self, input_x, mixup_lambda=None):
 
-        x = self.spectrogram_extractor(input_x)  # (batch_size, 1, time_steps, freq_bins)
+        x = self.spectrogram_extractor(
+            input_x
+        )  # (batch_size, 1, time_steps, freq_bins)
         x = self.logmel_extractor(x)  # (batch_size, 1, time_steps, mel_bins)
 
         frames_num = x.shape[2]
@@ -637,25 +700,24 @@ class PANNsDense169Att(nn.Module):
             x = self.spec_augmenter(x)
 
         # Mixup on spectrogram
-        if self.training  and self.apply_aug and mixup_lambda is not None:
+        if self.training and self.apply_aug and mixup_lambda is not None:
             x = do_mixup(x, mixup_lambda)
         return x, frames_num
-        
 
     def forward(self, input_data):
         input_x, mixup_lambda = input_data
         """
         Input: (batch_size, data_length)"""
         b, c, s = input_x.shape
-        input_x = input_x.reshape(b*c, s)
+        input_x = input_x.reshape(b * c, s)
         x, frames_num = self.preprocess(input_x, mixup_lambda=mixup_lambda)
         if mixup_lambda is not None:
-            b = (b*c)//2
+            b = (b * c) // 2
             c = 1
         # Output shape (batch size, channels, time, frequency)
         x = x.expand(x.shape[0], 3, x.shape[2], x.shape[3])
         x = self.cnn_feature_extractor(x)
-        
+
         # Aggregate in frequency axis
         x = torch.mean(x, dim=3)
 
@@ -673,27 +735,38 @@ class PANNsDense169Att(nn.Module):
         segmentwise_output = segmentwise_output.transpose(1, 2)
 
         # Get framewise output
-        framewise_output = interpolate(segmentwise_output,
-                                       self.interpolate_ratio)
+        framewise_output = interpolate(segmentwise_output, self.interpolate_ratio)
         framewise_output = pad_framewise_output(framewise_output, frames_num)
-        frame_shape =  framewise_output.shape
+        frame_shape = framewise_output.shape
         clip_shape = clipwise_output.shape
         output_dict = {
-            'framewise_output': framewise_output.reshape(b, c, frame_shape[1],frame_shape[2]),
-            'clipwise_output': clipwise_output.reshape(b, c, clip_shape[1]),
+            "framewise_output": framewise_output.reshape(
+                b, c, frame_shape[1], frame_shape[2]
+            ),
+            "clipwise_output": clipwise_output.reshape(b, c, clip_shape[1]),
         }
 
         return output_dict
 
 
 class PANNsDense201Att(nn.Module):
-    def __init__(self, sample_rate: int, window_size: int, hop_size: int,
-                 mel_bins: int, fmin: int, fmax: int, classes_num: int, apply_aug: bool, top_db=None):
+    def __init__(
+        self,
+        sample_rate: int,
+        window_size: int,
+        hop_size: int,
+        mel_bins: int,
+        fmin: int,
+        fmax: int,
+        classes_num: int,
+        apply_aug: bool,
+        top_db=None,
+    ):
         super().__init__()
-        
-        window = 'hann'
+
+        window = "hann"
         center = True
-        pad_mode = 'reflect'
+        pad_mode = "reflect"
         ref = 1.0
         amin = 1e-10
         self.interpolate_ratio = 32  # Downsampled ratio
@@ -707,7 +780,8 @@ class PANNsDense201Att(nn.Module):
             window=window,
             center=center,
             pad_mode=pad_mode,
-            freeze_parameters=True)
+            freeze_parameters=True,
+        )
 
         # Logmel feature extractor
         self.logmel_extractor = LogmelFilterBank(
@@ -719,19 +793,21 @@ class PANNsDense201Att(nn.Module):
             ref=ref,
             amin=amin,
             top_db=top_db,
-            freeze_parameters=True)
+            freeze_parameters=True,
+        )
 
         # Spec augmenter
         self.spec_augmenter = SpecAugmentation(
             time_drop_width=64,
             time_stripes_num=2,
             freq_drop_width=8,
-            freq_stripes_num=2)
+            freq_stripes_num=2,
+        )
 
         self.bn0 = nn.BatchNorm2d(mel_bins)
 
         self.fc1 = nn.Linear(1920, 1024, bias=True)
-        self.att_block = AttBlock(1024, classes_num, activation='sigmoid')
+        self.att_block = AttBlock(1024, classes_num, activation="sigmoid")
 
         self.init_weight()
 
@@ -740,14 +816,16 @@ class PANNsDense201Att(nn.Module):
     def init_weight(self):
         init_bn(self.bn0)
         init_layer(self.fc1)
-        
+
     def cnn_feature_extractor(self, x):
         x = self.densenet_features(x)
         return x
-    
+
     def preprocess(self, input_x, mixup_lambda=None):
 
-        x = self.spectrogram_extractor(input_x)  # (batch_size, 1, time_steps, freq_bins)
+        x = self.spectrogram_extractor(
+            input_x
+        )  # (batch_size, 1, time_steps, freq_bins)
         x = self.logmel_extractor(x)  # (batch_size, 1, time_steps, mel_bins)
 
         frames_num = x.shape[2]
@@ -760,25 +838,24 @@ class PANNsDense201Att(nn.Module):
             x = self.spec_augmenter(x)
 
         # Mixup on spectrogram
-        if self.training  and self.apply_aug and mixup_lambda is not None:
+        if self.training and self.apply_aug and mixup_lambda is not None:
             x = do_mixup(x, mixup_lambda)
         return x, frames_num
-        
 
     def forward(self, input_data):
         input_x, mixup_lambda = input_data
         """
         Input: (batch_size, data_length)"""
         b, c, s = input_x.shape
-        input_x = input_x.reshape(b*c, s)
+        input_x = input_x.reshape(b * c, s)
         x, frames_num = self.preprocess(input_x, mixup_lambda=mixup_lambda)
         if mixup_lambda is not None:
-            b = (b*c)//2
+            b = (b * c) // 2
             c = 1
         # Output shape (batch size, channels, time, frequency)
         x = x.expand(x.shape[0], 3, x.shape[2], x.shape[3])
         x = self.cnn_feature_extractor(x)
-        
+
         # Aggregate in frequency axis
         x = torch.mean(x, dim=3)
 
@@ -796,14 +873,15 @@ class PANNsDense201Att(nn.Module):
         segmentwise_output = segmentwise_output.transpose(1, 2)
 
         # Get framewise output
-        framewise_output = interpolate(segmentwise_output,
-                                       self.interpolate_ratio)
+        framewise_output = interpolate(segmentwise_output, self.interpolate_ratio)
         framewise_output = pad_framewise_output(framewise_output, frames_num)
-        frame_shape =  framewise_output.shape
+        frame_shape = framewise_output.shape
         clip_shape = clipwise_output.shape
         output_dict = {
-            'framewise_output': framewise_output.reshape(b, c, frame_shape[1],frame_shape[2]),
-            'clipwise_output': clipwise_output.reshape(b, c, clip_shape[1]),
+            "framewise_output": framewise_output.reshape(
+                b, c, frame_shape[1], frame_shape[2]
+            ),
+            "clipwise_output": clipwise_output.reshape(b, c, clip_shape[1]),
         }
 
         return output_dict

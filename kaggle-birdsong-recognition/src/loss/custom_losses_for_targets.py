@@ -4,6 +4,7 @@ import torch.nn.functional as F
 
 EPSILON_FP16 = 1e-5
 
+
 class LqLoss2(nn.Module):
     def __init__(self, q=0.5):
         super().__init__()
@@ -14,6 +15,7 @@ class LqLoss2(nn.Module):
         loss = (1 - (loss + EPSILON_FP16) ** self.q) / self.q
         return loss.mean()
 
+
 class LSoftLoss2(nn.Module):
     def __init__(self, beta=0.5):
         super().__init__()
@@ -21,10 +23,13 @@ class LSoftLoss2(nn.Module):
 
     def forward(self, y_pred, y_true):
         with torch.no_grad():
-#             y_true_update = self.beta * y_true + (1 - self.beta) * y_pred
-            mask_y_true = y_true==1.0
-            y_true[mask_y_true] = self.beta*y_true[mask_y_true]+(1-self.beta)*y_pred[mask_y_true]
+            #             y_true_update = self.beta * y_true + (1 - self.beta) * y_pred
+            mask_y_true = y_true == 1.0
+            y_true[mask_y_true] = (
+                self.beta * y_true[mask_y_true] + (1 - self.beta) * y_pred[mask_y_true]
+            )
         return F.binary_cross_entropy(y_pred, y_true)
+
 
 class CuratedLoss2(nn.Module):
     def __init__(self):
@@ -38,9 +43,9 @@ class CuratedLoss2(nn.Module):
 class NoisyCuratedLossTargetted(nn.Module):
     def __init__(self, noisy_type, beta=0.7, q=0.7):
         super().__init__()
-        if noisy_type=="lsoft_targetted":
+        if noisy_type == "lsoft_targetted":
             self.noisy_loss = LSoftLoss2(beta=beta)
-        elif noisy_type=="lq":
+        elif noisy_type == "lq":
             # not Implemented yet
             # self.noisy_loss = LqLoss(q=q)
             pass
@@ -52,10 +57,10 @@ class NoisyCuratedLossTargetted(nn.Module):
         clean = clean.reshape(-1)
         bs, s, o = target.shape
         output = self.sigmoid(output)
-        output = torch.clamp(output, min=EPSILON_FP16, max=1.0-EPSILON_FP16)
+        output = torch.clamp(output, min=EPSILON_FP16, max=1.0 - EPSILON_FP16)
 
-        output = output.reshape(bs*s,o)
-        target = target.reshape(bs*s,o)
+        output = output.reshape(bs * s, o)
+        target = target.reshape(bs * s, o)
 
         noisy_indexes = (clean == 0).nonzero().squeeze(1)
         curated_indexes = clean.nonzero().squeeze(1)
@@ -68,7 +73,7 @@ class NoisyCuratedLossTargetted(nn.Module):
             curated_loss = curated_loss * (curated_len / bs)
         else:
             curated_loss = 0.0
-        
+
         # Changed order since updating target
         noisy_len = noisy_indexes.shape[0]
         if noisy_len > 0:

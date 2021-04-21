@@ -4,11 +4,12 @@ import torch.nn.functional as F
 
 EPSILON_FP16 = 1e-5
 
+
 class SedRemovedFocalLoss(nn.Module):
     def __init__(self, gamma=0.0, alpha=1.0):
         super().__init__()
 
-        self.loss_fn = nn.BCELoss(reduction='none')
+        self.loss_fn = nn.BCELoss(reduction="none")
         self.gamma = gamma
         self.alpha = alpha
         self.loss_keys = ["bce_loss", "F_loss", "FRemoved_loss"]
@@ -20,11 +21,11 @@ class SedRemovedFocalLoss(nn.Module):
 
         # Sigmoid has already been applied in the model
 
-        y_pred = torch.clamp(y_pred, min=EPSILON_FP16, max=1.0-EPSILON_FP16)
-        y_pred = y_pred.reshape(bs*s,o)
-        y_true = y_true.reshape(bs*s,o)
-        y_sec_true = y_sec_true.reshape(bs*s,o)
-        
+        y_pred = torch.clamp(y_pred, min=EPSILON_FP16, max=1.0 - EPSILON_FP16)
+        y_pred = y_pred.reshape(bs * s, o)
+        y_true = y_true.reshape(bs * s, o)
+        y_sec_true = y_sec_true.reshape(bs * s, o)
+
         with torch.no_grad():
             y_ones_mask = torch.ones_like(y_sec_true)
             y_zeros_mask = torch.zeros_like(y_sec_true)
@@ -32,11 +33,13 @@ class SedRemovedFocalLoss(nn.Module):
 
         bce_loss = self.loss_fn(y_pred, y_true)
         pt = torch.exp(-bce_loss)
-        F_loss = self.alpha * (1-pt)**self.gamma * bce_loss
-        FRemoved_loss = (1.0-y_mask)*F_loss
-        
+        F_loss = self.alpha * (1 - pt) ** self.gamma * bce_loss
+        FRemoved_loss = (1.0 - y_mask) * F_loss
+
         FRemoved_loss = FRemoved_loss.mean()
 
-        return FRemoved_loss, {"bce_loss": bce_loss.mean(), "F_loss": F_loss.mean(), "FRemoved_loss": FRemoved_loss }
-
-        
+        return FRemoved_loss, {
+            "bce_loss": bce_loss.mean(),
+            "F_loss": F_loss.mean(),
+            "FRemoved_loss": FRemoved_loss,
+        }

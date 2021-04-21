@@ -479,7 +479,6 @@ class WaveformDataset(data.Dataset):
         return y, meta_data, labels, labels_w_secondary
 
 
-
 class WaveformDatasetKkiller(data.Dataset):
     def __init__(
         self,
@@ -525,8 +524,8 @@ class WaveformDatasetKkiller(data.Dataset):
         labels[BIRD_CODE.index(ebird_code)] = 1.0
         labels_w_secondary = labels
         for second_label in secondary_label:
-          if second_label in BIRD_CODE:
-            labels_w_secondary[BIRD_CODE.index(second_label)] = 0.3
+            if second_label in BIRD_CODE:
+                labels_w_secondary[BIRD_CODE.index(second_label)] = 0.3
         labels_w_secondary = labels_w_secondary.astype(np.float)
         return image, meta_data, labels, labels_w_secondary
 

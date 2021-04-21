@@ -3,16 +3,17 @@ import torch
 from config_params.configs import get_dict_value, BIRD_CODE, INV_EBIRD_LABEL
 import os
 
+
 class Parameters(object):
     def __init__(self, hparams=None):
         self.fold = 0
-        self.name = os.path.basename(__file__).replace(".py","")
-        
+        self.name = os.path.basename(__file__).replace(".py", "")
+
         self.aug_name = "default"
         self.apply_mixup = False
         self.model_name = "sed_dense121att"
 
-        self.model_config =  {
+        self.model_config = {
             "sample_rate": 32000,
             "window_size": 1024,
             "hop_size": 320,
@@ -21,7 +22,7 @@ class Parameters(object):
             "fmax": 14000,
             "classes_num": 264,
             "apply_aug": True,
-            "top_db": None
+            "top_db": None,
         }
         self.pretrained_path = None
 
@@ -32,19 +33,18 @@ class Parameters(object):
 
         self.criterion_name = "sed_scaled_pos_neg_focal_loss"
         self.criterion_params = {
-            "gamma" : 0.0,
-            "alpha_0" : 1.0,
+            "gamma": 0.0,
+            "alpha_0": 1.0,
             "alpha_1": 1.0,
-            "secondary_factor": 1.0
+            "secondary_factor": 1.0,
         }
-        
 
         self.scheduler_name = "warmup_with_cosine"
         self.lr_scale_factor = 0.01
         self.lr = 0.001
 
         self.logger_name = "neptune"
-        
+
         self.PERIOD = 30
 
         self.train_ds_params = {
@@ -52,17 +52,17 @@ class Parameters(object):
             "csv_dir": Path(f"/folds/fold_{self.fold}_train.csv"),
             "period": self.PERIOD,
             "bird_code": BIRD_CODE,
-            "inv_ebird_label":INV_EBIRD_LABEL,
+            "inv_ebird_label": INV_EBIRD_LABEL,
             "isTraining": True,
             "num_test_samples": 1,
         }
-        
+
         self.valid_ds_params = {
             "root_dir": Path("/data/"),
             "csv_dir": Path(f"/folds/fold_{self.fold}_test.csv"),
             "period": self.PERIOD,
             "bird_code": BIRD_CODE,
-            "inv_ebird_label":INV_EBIRD_LABEL,
+            "inv_ebird_label": INV_EBIRD_LABEL,
             "background_audio_dir": Path("/background/data_ssw"),
             "isTraining": False,
             "num_test_samples": 2,
@@ -71,37 +71,34 @@ class Parameters(object):
         self.test_ds_params = {
             "root_dir": Path("/data/"),
             "csv_dir": Path(f"/folds/fold_{self.fold}_test.csv"),
-            "background_audio_dir":  Path("/background/data_ssw"),
+            "background_audio_dir": Path("/background/data_ssw"),
             "period": self.PERIOD,
             "bird_code": BIRD_CODE,
-            "inv_ebird_label":INV_EBIRD_LABEL,
+            "inv_ebird_label": INV_EBIRD_LABEL,
             "isTraining": False,
             "num_test_samples": 2,
         }
 
         self.checkpoint_params = {
-            "save_dir":f"/saved_models/{self.name}",
-            "n_saved":5,
-            "prefix_name":self.name,
+            "save_dir": f"/saved_models/{self.name}",
+            "n_saved": 5,
+            "prefix_name": self.name,
         }
-        
+
         self.train_bs = 24
         self.train_num_workers = 8
         self.valid_bs = 32
         self.valid_num_workers = 4
         self.metrics = ["lraps", "f1score_clip", "f1score_frame"]
-        
+
         self.track_metric = "f1score_clip"
         self.metric_factor = 1
-        
+
         self.checkpoint_dir = None
         self.add_pbar = True
-        
-        self.run_params = {
-            "max_epochs": 50,
-            "epoch_length": None
-        }
-        
+
+        self.run_params = {"max_epochs": 50, "epoch_length": None}
+
         self.logger_params = {
             "project_name": "bird-song",
             "log_every": 10,
@@ -123,12 +120,11 @@ class Parameters(object):
                 "lr_scale_factor": self.lr_scale_factor,
                 "period": self.PERIOD,
                 **self.model_config,
-                **self.criterion_params
-            }
+                **self.criterion_params,
+            },
         }
-        
-        self.dist_params = {
-        }
+
+        self.dist_params = {}
 
         self.val_length = None
         self.eval_every = 2
