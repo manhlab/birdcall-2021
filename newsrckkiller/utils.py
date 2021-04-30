@@ -5,6 +5,7 @@ import numpy as np
 import json
 import re
 import time
+from pathlib import Path
 def set_seed(seed=42):
     random.seed(seed)
     os.environ["PYTHONHASHSEED"] = str(seed)
@@ -38,7 +39,7 @@ class AutoSave:
         self.logs = []
         self.metric = metric
         self.mode = mode
-        self.root = Path(root or MODEL_ROOT)
+        self.root = Path(root)
         assert self.root.exists()
         self.name = name
 
@@ -51,7 +52,7 @@ class AutoSave:
 
         self.top_metrics.insert(rank+1, metric)
         if len(self.top_metrics) > self.top_k:
-        self.top_metrics.pop(0)
+            self.top_metrics.pop(0)
 
         self.logs.append(metrics)
         self.save(model, metric, rank, metrics["epoch"])
@@ -66,13 +67,13 @@ class AutoSave:
         old_model = None
         self.top_models.insert(rank+1, name)
         if len(self.top_models) > self.top_k:
-        old_model = self.root.joinpath(self.top_models[0])
-        self.top_models.pop(0)      
+            old_model = self.root.joinpath(self.top_models[0])
+            self.top_models.pop(0)      
 
         torch.save(model.state_dict(), path.as_posix())
 
         if old_model is not None:
-        old_model.unlink()
+            old_model.unlink()
 
         self.to_json()
 
@@ -80,17 +81,17 @@ class AutoSave:
     def rank(self, val):
         r = -1
         for top_val in self.top_metrics:
-        if val <= top_val:
-            return r
-        r += 1
+            if val <= top_val:
+                return r
+            r += 1
 
         return r
   
     def to_json(self):
-        # t = time.strftime("%Y%m%d%H%M%S")
+    # t = time.strftime("%Y%m%d%H%M%S")
         name = "{}_logs".format(self.name)
         name = re.sub(r"[^\w_-]", "", name) + ".json"
         path = self.root.joinpath(name)
 
         with path.open("w") as f:
-        json.dump(self.logs, f, indent=2)
+            json.dump(self.logs, f, indent=2)
