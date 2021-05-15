@@ -6,8 +6,22 @@ import json
 import re
 import time
 from pathlib import Path
-from torch.utils.data.sampler import Sampler
+from torchvision import transforms
 
+from torch.utils.data.sampler import Sampler
+def random_power(images, power = 1.5, c= 0.7):
+    images = images - images.min()
+    images = images/(images.max()+0.0000001)
+    images = images**(random.random()*power + c)
+    return images
+def mono_to_color(X: np.ndarray, mean=0.5, std=0.5, eps=1e-6):
+    trans = transforms.Compose([transforms.ToPILImage(),
+                                        transforms.ToTensor(),
+                                        transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])])
+    X = np.stack([X, X, X], axis=-1)
+    V = (255 * X).astype(np.uint8)
+    V = (trans(V)+1)/2
+    return V
 class SimpleBalanceClassSampler(Sampler):
 
     def __init__(self, targets, classes_num):
