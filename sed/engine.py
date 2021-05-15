@@ -166,27 +166,3 @@ def one_fold(model_name, fold, train_set, val_set, epochs=20, save=True, save_ro
       }
       saver.log(net, metrics)
   torch.save(net.state_dict(), save_root/f"last_epochs_fold{fold}.pth")
-
-def train(model_name, epochs=20, save=True, n_splits=5, seed=177, save_root=None, suffix=""):
-    gc.collect()
-    torch.cuda.empty_cache()
-    # environment
-    set_seed(CFG.seed)
-    device = get_device()
-    # validation
-    # data
-    save_root.mkdir(exist_ok=True, parents=True)
-    for i in range(5):
-        if i not in CFG.folds:
-            continue
-        save_root = CFG.MODEL_ROOT/f"fold-{i}"
-        save_root.mkdir(exist_ok=True, parents=True)
-
-        print("=" * 120)
-        print(f"Fold {i} Training")
-        print("=" * 120)
-        trn_df = df[df['fold']!=i].reset_index(drop=True)
-        val_df = df[df['fold']==i].reset_index(drop=True)
-        one_fold(model_name, fold=i, train_set=trn_df , val_set=val_df , epochs=CFG.epochs, save=save, save_root=save_root)
-        gc.collect()
-        torch.cuda.empty_cache()
