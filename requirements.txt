@@ -1,7 +1,0 @@
-catalyst
-colorednoise==1.1.1
-efficientnet-pytorch==0.6.3
-iterative-stratification==0.1.6
-torchlibrosa
-timm
-pytorch_lightning
