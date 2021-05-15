@@ -7,10 +7,11 @@ import numpy as np
 from tqdm.notebook import tqdm
 from pathlib import Path
 import gc
-from utils import *
-from dataloader import *
-from config import CFG
-from model import ResNestSED, EfficientNetSED
+from .utils import *
+from .dataloader import *
+from .config import CFG
+from .model import ResNestSED, EfficientNetSED
+from .criterion import *
 
 
 def one_step( xb,  yb, net,  criterion, optimizer, scheduler=None, mixup_proba=0.5, alpha=5, label_smoothing=True):
@@ -47,8 +48,8 @@ def evaluate(net, criterion, val_laoder):
     val_laoder = tqdm_notebook(val_laoder, leave = False, total=len(val_laoder))
 
     for icount, (xb, yb) in  enumerate(val_laoder):
-        y.append(yb.to(DEVICE))
-        xb = xb.to(DEVICE)
+        y.append(yb.to(CFG.DEVICE))
+        xb = xb.to(CFG.DEVICE)
         o = net(xb)["logit"]
         os.append(o)
     y = torch.cat(y)

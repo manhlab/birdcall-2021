@@ -1,8 +1,9 @@
 from  torch.utils.data import Dataset, DataLoader
 import numpy as np
-from config import CFG
-
-
+from .config import CFG
+import random
+import librosa
+from .utils import mono_to_color, random_power
 class BirdClefDataset(Dataset):
     def __init__(self,  meta, sr=CFG.sr, is_train=True, num_classes=CFG.num_classes, duration=CFG.duration):
         self.meta = meta.copy().reset_index(drop=True)
@@ -66,9 +67,9 @@ class BirdClefDataset(Dataset):
                     images = images*pink_noise
                     images = images/(images.max()+0.0000001)
 
-            if random.random()<0.1:
-                    w = np.random.uniform(0.2, 0.5)
-                    images = (images + w*imagesx[np.random.choice(len(imagesx))])/(1+w)
+            # if random.random()<0.1:
+            #         w = np.random.uniform(0.2, 0.5)
+            #         images = (images + w*imagesx[np.random.choice(len(imagesx))])/(1+w)
 
             if random.random()<0.5:
                     k = np.random.uniform(0.0, 0.7)

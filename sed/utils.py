@@ -86,7 +86,7 @@ def init_logger(log_file='train.log'):
     handler2.setFormatter(Formatter("%(message)s"))
     logger.addHandler(handler1)
     logger.addHandler(handler2)
-    return loggerutil
+    return logger
 
 class AutoSave:
     def __init__(self, top_k=2, metric="f1", mode="min", root=None, name="ckpt"):

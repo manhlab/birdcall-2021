@@ -1,8 +1,9 @@
 
-from src.engine import train
+from sed.engine import *
 import pandas as pd
 from pathlib import Path
-from src.config import CFG
+from sed.config import CFG
+from sed.utils import *
 
 def train(df,model_name, epochs=20, save=True, n_splits=5, seed=177, save_root=None, suffix=""):
     gc.collect()
