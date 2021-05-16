@@ -101,13 +101,11 @@ def one_epoch(net, criterion, optimizer, scheduler, train_laoder, val_laoder, n=
   scheduler.step()  
   return (l, l_val), (lrap, lrap_val), (f1, f1_val), (rec, rec_val), (prec, prec_val)
 
-def one_fold(model_name, fold, train_set, val_set, epochs=20, save=True, save_root=None, balance_sample=True):
+def one_fold(model_name, fold, train_set, val_set, epochs=20, save=True, save_root=None,background_audio=None, balance_sample=False):
 
   save_root = Path(save_root) or CFG.MODEL_ROOT
   saver = AutoSave(root=save_root, name=f"birdclef_{model_name}_fold{fold}", metric="f1_val")
-  config_model =   {"base_model_name": "efficientnet-b1",
-    "pretrained": True,
-    "num_classes": 397}
+  config_model =   {"base_model_name": "efficientnet-b1", "pretrained": True, "num_classes": 397}
 
   # net =  EfficientNetSED("efficientnet-b1", True, 397).to(DEVICE)
   net =  ResNestSED("resnest50", True, 397).to(CFG.DEVICE)
@@ -116,20 +114,10 @@ def one_fold(model_name, fold, train_set, val_set, epochs=20, save=True, save_ro
   criterion = ImprovedPANNsLoss(weights=[1.0 , 0.5])
   optimizer = optim.AdamW(net.parameters(), lr=CFG.lr)
   scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer,  T_max=50)
-  train_data = BirdClefDataset_V2( meta=train_set, sr=CFG.sr, duration=CFG.duration, is_train=True)
-  if balance_sample:
-    all_targets = []
-    for i in range(len(train_set)):
-      ebird_code = train_set.iloc[i]["primary_label"]
-      labels = np.zeros(397, dtype="f")
-      labels[CFG.target_columns.index(ebird_code)] = 1
-      all_targets.append(labels)
-    all_targets = np.array(all_targets)
-    train_laoder = DataLoader(train_data, batch_size=CFG.batch_size, num_workers=CFG.num_workers, sampler=SimpleBalanceClassSampler(all_targets, 397), pin_memory=True)
-  else:
-    train_laoder = DataLoader(train_data, batch_size=CFG.batch_size, num_workers=CFG.num_workers, shuffle=True, pin_memory=True)
-  val_data = BirdClefDataset_V2( meta=val_set,  sr=CFG.sr, duration=CFG.duration, is_train=False)
-  val_laoder = DataLoader(val_data, batch_size=CFG.batch_size, num_workers=CFG.num_workers, shuffle=False, pin_memory=True)
+  train_data = BirdClefDataset( meta=train_set, sr=CFG.sr, duration=CFG.duration,background_audio=background_audio, is_train=True)
+  train_laoder = DataLoader(train_data, batch_size=CFG.batch_size, num_workers=CFG.num_workers, shuffle=True)
+  val_data = BirdClefDataset( meta=val_set,  sr=CFG.sr, duration=CFG.duration, is_train=False)
+  val_laoder = DataLoader(val_data, batch_size=CFG.batch_size, num_workers=CFG.num_workers, shuffle=False)
   epochs_bar = tqdm(list(range(epochs)), leave=False)
   for epoch  in epochs_bar:
     epochs_bar.set_description(f"--> [EPOCH {epoch:02d}]")
@@ -168,7 +156,7 @@ def one_fold(model_name, fold, train_set, val_set, epochs=20, save=True, save_ro
       saver.log(net, metrics)
   torch.save(net.state_dict(), save_root/f"last_epochs_fold{fold}.pth")
 
-def train(df,model_name, epochs=20, save=True, n_splits=5, seed=177, save_root=None, suffix=""):
+def train(df,model_name, epochs=20, save=True, n_splits=5, seed=177, save_root=None,background_audio=None, suffix=""):
     gc.collect()
     torch.cuda.empty_cache()
     # environment
@@ -188,6 +176,6 @@ def train(df,model_name, epochs=20, save=True, n_splits=5, seed=177, save_root=N
         print("=" * 120)
         trn_df = df[df['fold']!=i].reset_index(drop=True)
         val_df = df[df['fold']==i].reset_index(drop=True)
-        one_fold(model_name, fold=i, train_set=trn_df , val_set=val_df , epochs=CFG.epochs, save=save, save_root=save_root)
+        one_fold(model_name, fold=i, train_set=trn_df , val_set=val_df , epochs=CFG.epochs,background_audio=background_audio, save=save, save_root=save_root)
         gc.collect()
         torch.cuda.empty_cache()

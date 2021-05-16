@@ -9,49 +9,63 @@ from pathlib import Path
 from torchvision import transforms
 
 from torch.utils.data.sampler import Sampler
-def random_power(images, power = 1.5, c= 0.7):
+
+
+def random_power(images, power=1.5, c=0.7):
     images = images - images.min()
-    images = images/(images.max()+0.0000001)
-    images = images**(random.random()*power + c)
+    images = images / (images.max() + 0.0000001)
+    images = images ** (random.random() * power + c)
     return images
+
+
 def mono_to_color(X: np.ndarray, mean=0.5, std=0.5, eps=1e-6):
-    trans = transforms.Compose([transforms.ToPILImage(),
-                                        transforms.ToTensor(),
-                                        transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])])
+    trans = transforms.Compose(
+        [
+            transforms.ToPILImage(),
+            transforms.ToTensor(),
+            transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
+        ]
+    )
     X = np.stack([X, X, X], axis=-1)
     V = (255 * X).astype(np.uint8)
-    V = (trans(V)+1)/2
+    V = (trans(V) + 1) / 2
     return V
-class SimpleBalanceClassSampler(Sampler):
 
+
+class SimpleBalanceClassSampler(Sampler):
     def __init__(self, targets, classes_num):
 
         self.targets = targets
         self.classes_num = classes_num
-        self.max_num=100 #hardcode 
-        
+        self.max_num = 100  # hardcode
+
         self.indexes_per_class = []
         for k in range(self.classes_num):
-            self.indexes_per_class.append(
-                np.where(self.targets[:, k] == 1)[0])
-        
+            self.indexes_per_class.append(np.where(self.targets[:, k] == 1)[0])
+
         self.length = self.classes_num * self.max_num
 
     def __iter__(self):
-        
+
         all_indexs = []
-        
+
         for k in range(self.classes_num):
             if len(self.indexes_per_class[k]) == self.max_num:
                 all_indexs.append(self.indexes_per_class[k])
             elif len(self.indexes_per_class[k]) > self.max_num:
-                random_choice = np.random.choice(self.indexes_per_class[k], int(self.max_num), replace=True)
+                random_choice = np.random.choice(
+                    self.indexes_per_class[k], int(self.max_num), replace=True
+                )
                 all_indexs.append(np.array(list(random_choice)))
             else:
                 gap = self.max_num - len(self.indexes_per_class[k])
-                random_choice = np.random.choice(self.indexes_per_class[k], int(gap), replace=True)
-                all_indexs.append(np.array(list(random_choice) + list(self.indexes_per_class[k])))
-                
+                random_choice = np.random.choice(
+                    self.indexes_per_class[k], int(gap), replace=True
+                )
+                all_indexs.append(
+                    np.array(list(random_choice) + list(self.indexes_per_class[k]))
+                )
+
         l = np.stack(all_indexs).T
         l = l.reshape(-1)
         random.shuffle(l)
@@ -59,7 +73,8 @@ class SimpleBalanceClassSampler(Sampler):
 
     def __len__(self):
         return int(self.length)
-        
+
+
 def set_seed(seed=42):
     random.seed(seed)
     os.environ["PYTHONHASHSEED"] = str(seed)
@@ -70,6 +85,7 @@ def set_seed(seed=42):
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = True
 
+
 def mixup_data(x, y, alpha=5):
     lam = np.random.beta(alpha, alpha) if alpha > 0 else 1
     index = torch.randperm(x.size()[0]).cuda()
@@ -77,7 +93,8 @@ def mixup_data(x, y, alpha=5):
     y_a, y_b = y, y[index]
     return mixed_x, y_a, y_b, lam
 
-def smooth_label(y , alpha=0.01):
+
+def smooth_label(y, alpha=0.01):
     y = y * (1 - alpha)
     y[y == 0] = alpha
     return y
@@ -86,12 +103,14 @@ def smooth_label(y , alpha=0.01):
 def mixup_criterion(criterion, pred, y_a, y_b, lam):
     return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
 
+
 def get_device() -> torch.device:
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def init_logger(log_file='train.log'):
-    from logging import getLogger, INFO, FileHandler,  Formatter,  StreamHandler
+def init_logger(log_file="train.log"):
+    from logging import getLogger, INFO, FileHandler, Formatter, StreamHandler
+
     logger = getLogger(__name__)
     logger.setLevel(INFO)
     handler1 = StreamHandler()
@@ -101,6 +120,7 @@ def init_logger(log_file='train.log'):
     logger.addHandler(handler1)
     logger.addHandler(handler2)
     return logger
+
 
 class AutoSave:
     def __init__(self, top_k=2, metric="f1", mode="min", root=None, name="ckpt"):
@@ -119,25 +139,26 @@ class AutoSave:
         metric = metrics[self.metric]
         rank = self.rank(metric)
 
-        self.top_metrics.insert(rank+1, metric)
+        self.top_metrics.insert(rank + 1, metric)
         if len(self.top_metrics) > self.top_k:
             self.top_metrics.pop(0)
 
         self.logs.append(metrics)
         self.save(model, metric, rank, metrics["epoch"])
 
-
     def save(self, model, metric, rank, epoch):
         t = time.strftime("%Y%m%d%H%M%S")
-        name = "{}_epoch_{:02d}_{}_{:.04f}_{}".format(self.name, epoch, self.metric, metric, t)
+        name = "{}_epoch_{:02d}_{}_{:.04f}_{}".format(
+            self.name, epoch, self.metric, metric, t
+        )
         name = re.sub(r"[^\w_-]", "", name) + ".pth"
         path = self.root.joinpath(name)
 
         old_model = None
-        self.top_models.insert(rank+1, name)
+        self.top_models.insert(rank + 1, name)
         if len(self.top_models) > self.top_k:
             old_model = self.root.joinpath(self.top_models[0])
-            self.top_models.pop(0)      
+            self.top_models.pop(0)
 
         torch.save(model.state_dict(), path.as_posix())
 
@@ -145,7 +166,6 @@ class AutoSave:
             old_model.unlink()
 
         self.to_json()
-
 
     def rank(self, val):
         r = -1
@@ -155,9 +175,9 @@ class AutoSave:
             r += 1
 
         return r
-  
+
     def to_json(self):
-    # t = time.strftime("%Y%m%d%H%M%S")
+        # t = time.strftime("%Y%m%d%H%M%S")
         name = "{}_logs".format(self.name)
         name = re.sub(r"[^\w_-]", "", name) + ".json"
         path = self.root.joinpath(name)
