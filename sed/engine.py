@@ -101,7 +101,7 @@ def one_epoch(net, criterion, optimizer, scheduler, train_laoder, val_laoder, n=
   scheduler.step()  
   return (l, l_val), (lrap, lrap_val), (f1, f1_val), (rec, rec_val), (prec, prec_val)
 
-def one_fold(model_name, fold, train_set, val_set, epochs=20, save=True, save_root=None,background_audio=None, balance_sample=False):
+def one_fold(model_name, fold, train_set, val_set, epochs=20, save=True, save_root=None,background_audio=None, balance_sample=False):
 
   save_root = Path(save_root) or CFG.MODEL_ROOT
   saver = AutoSave(root=save_root, name=f"birdclef_{model_name}_fold{fold}", metric="f1_val")
