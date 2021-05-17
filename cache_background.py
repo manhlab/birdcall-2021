@@ -82,7 +82,7 @@ class AudioToImage:
             path.parent.mkdir(exist_ok=True, parents=True)
             np.save(str(path), images)
         else:
-            return row.filename, images
+            return filepath, images
 
 
 def get_audios_as_images(filelist):

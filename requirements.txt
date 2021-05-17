@@ -2,3 +2,4 @@ torchlibrosa
 efficientnet_pytorch
 timm
 fvcore
+resnest

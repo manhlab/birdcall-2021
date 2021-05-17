@@ -108,7 +108,7 @@ class BirdClefDataset(Dataset):
 
         # Change the contrast | Изменить контрастность
         images = images.astype("float32", copy=False)
-        if background_audio:
+        if self.background_audio:
             idy = random.randint(0, len(self.background_audio) - 1)
 
             mel = np.load(self.background_audio[idy])
@@ -203,7 +203,7 @@ class BirdClefDataset_V2(Dataset):
                 break
             if self.is_train:
                 break
-        if background_audio:
+        if self.background_audio:
             idy = random.randint(0, len(self.background_audio) - 1)
             mel = np.load(self.background_audio[idy])
             mel = np.concatenate((np.zeros((self.n_mels, self.len_chack)), mel), axis=1)
