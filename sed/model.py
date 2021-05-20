@@ -34,6 +34,7 @@ from torchlibrosa.augmentation import SpecAugmentation
 from resnest.torch import resnest50
 import timm
 
+
 def init_layer(layer):
     nn.init.xavier_uniform_(layer.weight)
 
@@ -529,14 +530,18 @@ class EfficientNetSED(nn.Module):
 
         return output_dict
 
+
 class TimmSED(nn.Module):
-    def __init__(self, base_model_name: str, pretrained=False, num_classes=397, in_channels=3):
+    def __init__(
+        self, base_model_name: str, pretrained=False, num_classes=397, in_channels=3
+    ):
         super().__init__()
 
         self.bn0 = nn.BatchNorm2d(CFG.nmels)
 
         base_model = timm.create_model(
-            base_model_name, pretrained=pretrained, in_chans=in_channels)
+            base_model_name, pretrained=pretrained, in_chans=in_channels
+        )
         layers = list(base_model.children())[:-2]
         self.encoder = nn.Sequential(*layers)
 
@@ -545,8 +550,7 @@ class TimmSED(nn.Module):
         else:
             in_features = base_model.classifier.in_features
         self.fc1 = nn.Linear(in_features, in_features, bias=True)
-        self.att_block = AttBlockV2(
-            in_features, num_classes, activation="sigmoid")
+        self.att_block = AttBlockV2(in_features, num_classes, activation="sigmoid")
 
         self.init_weight()
 
@@ -580,8 +584,7 @@ class TimmSED(nn.Module):
         interpolate_ratio = frames_num // segmentwise_output.size(1)
 
         # Get framewise output
-        framewise_output = interpolate(segmentwise_output,
-                                       interpolate_ratio)
+        framewise_output = interpolate(segmentwise_output, interpolate_ratio)
         framewise_output = pad_framewise_output(framewise_output, frames_num)
 
         framewise_logit = interpolate(segmentwise_logit, interpolate_ratio)
@@ -592,7 +595,7 @@ class TimmSED(nn.Module):
             "segmentwise_output": segmentwise_output,
             "logit": logit,
             "framewise_logit": framewise_logit,
-            "clipwise_output": clipwise_output
+            "clipwise_output": clipwise_output,
         }
 
         return output_dict

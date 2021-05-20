@@ -10,9 +10,10 @@ from torchvision import transforms
 
 from torch.utils.data.sampler import Sampler
 from .config import CFG
-import joblib 
+import joblib
 from glob import glob
 from tqdm import tqdm
+
 
 def random_power(images, power=1.5, c=0.7):
     images = images - images.min()
@@ -188,26 +189,13 @@ class AutoSave:
         with path.open("w") as f:
             json.dump(self.logs, f, indent=2)
 
+
 def mono_to_color_v2(X: np.ndarray, mean=0.5, std=0.5, eps=1e-6):
     trans = transforms.Compose(
         [
             transforms.ToPILImage(),
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                             std=[0.229, 0.224, 0.225]),
-        ]
-    )
-    X = np.stack([X, X, X], axis=-1)
-    V = (255 * X).astype(np.uint8)
-    V = (trans(V) + 1) / 2
-    return V
-def mono_to_color_train_v2(X: np.ndarray,len_chack, mean=0.5, std=0.5, eps=1e-6):
-    trans = transforms.Compose(
-        [
-            transforms.ToPILImage(),
-            transforms.Resize([ CFG.nmels, len_chack]),transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                             std=[0.229, 0.224, 0.225]),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ]
     )
     X = np.stack([X, X, X], axis=-1)
@@ -215,10 +203,25 @@ def mono_to_color_train_v2(X: np.ndarray,len_chack, mean=0.5, std=0.5, eps=1e-6)
     V = (trans(V) + 1) / 2
     return V
 
+
+def mono_to_color_train_v2(X: np.ndarray, len_chack, mean=0.5, std=0.5, eps=1e-6):
+    trans = transforms.Compose(
+        [
+            transforms.ToPILImage(),
+            transforms.Resize([CFG.nmels, len_chack]),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ]
+    )
+    X = np.stack([X, X, X], axis=-1)
+    V = (255 * X).astype(np.uint8)
+    V = (trans(V) + 1) / 2
+    return V
+
+
 def time_shift_spectrogram(spectrogram):
-    
-    
-    """ 
+
+    """
     https://github.com/johnmartinsson/bird-species-classification/wiki/Data-Augmentation
     Shift a spectrogram along the time axis in the spectral-domain at random
     """
@@ -227,13 +230,14 @@ def time_shift_spectrogram(spectrogram):
 
     return np.roll(spectrogram, nb_shifts, axis=1)
 
+
 def pitch_shift_spectrogram(spectrogram):
-    """ 
+    """
     https://github.com/johnmartinsson/bird-species-classification/wiki/Data-Augmentation
     Shift a spectrogram along the frequency axis in the spectral-domain at random
     """
     nb_cols = spectrogram.shape[0]
-    max_shifts = nb_cols//20 # around 5% shift
+    max_shifts = nb_cols // 20  # around 5% shift
     nb_shifts = np.random.randint(-max_shifts, max_shifts)
 
     return np.roll(spectrogram, nb_shifts, axis=0)
@@ -243,6 +247,7 @@ def load_data(dir):
     def load_row(row):
         # impath = TRAIN_IMAGES_ROOT/f"{row.primary_label}/{row.filename}.npy"
         return np.load(str(row))
+
     pool = joblib.Parallel(4)
     mapper = joblib.delayed(load_row)
     tasks = [mapper(row) for row in glob(dir)]
