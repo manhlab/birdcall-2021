@@ -18,7 +18,7 @@ class CFG:
     sr = 32000
     sample_rate = 32000
     duration = 7
-    nmels = 224
+    nmels = 128
     DEVICE = "cuda:0"
     MODEL_ROOT = Path(
         "/content/gdrive/MyDrive/Kaggle/kkiller-dataset/RESNET50_SED_MIX3AUDIO"

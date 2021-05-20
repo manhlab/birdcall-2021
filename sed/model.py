@@ -533,7 +533,7 @@ class TimmSED(nn.Module):
     def __init__(self, base_model_name: str, pretrained=False, num_classes=397, in_channels=3):
         super().__init__()
 
-        self.bn0 = nn.BatchNorm2d(CFG.n_mels)
+        self.bn0 = nn.BatchNorm2d(CFG.nmels)
 
         base_model = timm.create_model(
             base_model_name, pretrained=pretrained, in_chans=in_channels)

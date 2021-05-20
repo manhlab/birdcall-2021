@@ -205,7 +205,7 @@ def mono_to_color_train_v2(X: np.ndarray,len_chack, mean=0.5, std=0.5, eps=1e-6)
     trans = transforms.Compose(
         [
             transforms.ToPILImage(),
-            transforms.Resize([ CFG.n_mels, len_chack]),transforms.ToTensor(),
+            transforms.Resize([ CFG.nmels, len_chack]),transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406],
                              std=[0.229, 0.224, 0.225]),
         ]
