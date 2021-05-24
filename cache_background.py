@@ -77,7 +77,7 @@ class AudioToImage:
         audio, orig_sr = sf.read(filepath, dtype="float32")
         if self.resample and orig_sr != SR:
             audio = lb.resample(audio, orig_sr, SR, res_type=self.res_type)
-        step = int(3 * SR)
+        step = int(8 * SR)
         audios = [
             audio[i : i + self.audio_length]
             for i in range(0, max(1, len(audio) - self.audio_length + 1), step)
